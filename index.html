@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super-Bario99</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="450"></canvas>
+        <div id="score-display">Pontos: 0</div>
+        <div id="level-display">Fase: 1</div>
+        <div id="best-display">Recorde: 0</div>
+        <button id="mute-btn" aria-pressed="false" title="Silenciar">🔊</button>
+    </div>
+    
+    <div id="menu">
+        <h1>SUPER-BARIO99</h1>
+        <button id="continue-btn" style="display: none;">CONTINUAR</button>
+        <button id="start-btn">NOVO JOGO</button>
+        <button id="instructions-btn">INSTRUÇÕES</button>
+    </div>
+    
+    <div id="instructions" style="display: none;">
+        <h2>COMO JOGAR</h2>
+        <p>Setas direcionais para mover</p>
+        <p>Espaço para pular</p>
+        <p>X para atacar</p>
+        <p>Meta: Colete moedas e chegue na bandeira!</p>
+        <button id="back-btn">VOLTAR</button>
+    </div>
+
+    <div id="end-screen" style="display: none;">
+        <h2 id="end-title">FIM</h2>
+        <p id="end-score">Pontuação: 0</p>
+        <p id="end-best">Recorde: 0</p>
+        <button id="restart-btn">JOGAR NOVAMENTE</button>
+        <button id="menu-btn">MENU</button>
+    </div>
+
+        <!-- V2 (modular, sem ES Modules) -->
+        <script src="js/core/globals.js"></script>
+        <script src="js/core/audio-manager.js"></script>
+        <script src="js/ai/difficulty-system.js"></script>
+        <script src="js/ai/pathfinding.js"></script>
+        <script src="js/levels/levels.js"></script>
+        <script src="js/enemies/traditional/ninja.js"></script>
+        <script src="js/enemies/traditional/yokai.js"></script>
+        <script src="js/enemies/traditional/samurai.js"></script>
+        <script src="js/enemies/traditional/tanuki.js"></script>
+        <script src="js/enemies/traditional/kitsune.js"></script>
+        <script src="js/enemies/traditional/drone.js"></script>
+        <script src="js/enemies/bosses/theme-boss.js"></script>
+        <script src="js/core/player.js"></script>
+        <script src="js/core/game.js"></script>
+        <script>
+            // Boot v2
+            (function () {
+                const game = new SuperBario99.GameV2();
+                game.init();
+            })();
+        </script>
+</body>
+</html>

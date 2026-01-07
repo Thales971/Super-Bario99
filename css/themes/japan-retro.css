@@ -1,0 +1,8 @@
+/* Tema Japão Retro/Anime (v2)
+   Mantido separado para facilitar expansão.
+   OBS: O render principal do tema é via Canvas (shapes), não via sprites/imagens.
+*/
+
+:root {
+  --ui-accent: rgba(255, 180, 220, 0.95);
+}

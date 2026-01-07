@@ -1,0 +1,147 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: min(800px, calc(100vw - 24px));
+    aspect-ratio: 800 / 450;
+    margin: 20px auto;
+}
+
+#game-canvas {
+    width: 100%;
+    height: auto;
+    background: #87CEEB;
+    border: 4px solid #333;
+    display: block;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+#score-display, #level-display, #best-display {
+    position: absolute;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    user-select: none;
+}
+
+#score-display {
+    top: 10px;
+    left: 10px;
+}
+
+#level-display {
+    top: 10px;
+    right: 10px;
+}
+
+#best-display {
+    top: 44px;
+    left: 10px;
+    font-size: 18px;
+    opacity: 0.95;
+}
+
+#mute-btn {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 52px;
+    height: 44px;
+    border-radius: 12px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+}
+
+#menu, #instructions, #end-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    z-index: 100;
+}
+
+#menu h1 {
+    font-size: 52px;
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(255, 182, 213, 0.9), 0 0 18px rgba(255, 210, 125, 0.7);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+button {
+    background: linear-gradient(45deg, #ff6b6b, #ffa500);
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    margin: 10px;
+    font-size: 24px;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 0 15px rgba(255,165,0,0.7);
+}
+
+button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(255,165,0,1);
+}
+
+#instructions {
+    text-align: center;
+    padding: 40px;
+}
+
+#instructions h2 {
+    margin-bottom: 20px;
+    font-size: 36px;
+}
+
+#instructions p {
+    margin: 10px 0;
+    font-size: 20px;
+}
+
+#end-screen {
+    text-align: center;
+    padding: 40px;
+}
+
+#end-screen h2 {
+    margin-bottom: 18px;
+    font-size: 40px;
+}
+
+#end-screen p {
+    margin: 8px 0;
+    font-size: 20px;
+}
