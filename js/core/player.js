@@ -1,8 +1,153 @@
-// Player v2: humano estilo anime com kimono + ataque no X
+// Player v2: personagem retro (pixel art) + ataque no X
 
 window.SuperBario99 = window.SuperBario99 || {};
 
 (function () {
+  // Sprite "pixel art" simples (16x26) em escala 2 => 32x52.
+  // Observação: é um personagem original estilo retro (não é sprite NES copiado).
+  const SPRITE = {
+    idle: [
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '...RRRWWRRRRR...',
+      '...RRRWWRRRRR...',
+      '...RRRRRRRRRR...',
+      '....KKWWWWKK....',
+      '....KWWWWWWK....',
+      '....KKKWWKKK....',
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '....BBBBBBBB....',
+      '...BBBBBBBBBB...',
+      '...BBBBKKBBBB...',
+      '...BBBBBBBBBB...',
+      '....BBBBBBBB....',
+      '....BB....BB....',
+      '...BBB....BBB...',
+      '...KKK....KKK...',
+      '...KKK....KKK...',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................'
+    ],
+    run1: [
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '...RRRWWRRRRR...',
+      '...RRRWWRRRRR...',
+      '...RRRRRRRRRR...',
+      '....KKWWWWKK....',
+      '....KWWWWWWK....',
+      '....KKKWWKKK....',
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '....BBBBBBBB....',
+      '...BBBBBBBBBB...',
+      '...BBBBKKBBBB...',
+      '...BBBBBBBBBB...',
+      '....BBBBBBBB....',
+      '....BB....BB....',
+      '...BBB...BBB....',
+      '...KKK..KKK.....',
+      '....KKK.KKK.....',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................'
+    ],
+    run2: [
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '...RRRWWRRRRR...',
+      '...RRRWWRRRRR...',
+      '...RRRRRRRRRR...',
+      '....KKWWWWKK....',
+      '....KWWWWWWK....',
+      '....KKKWWKKK....',
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '....BBBBBBBB....',
+      '...BBBBBBBBBB...',
+      '...BBBBKKBBBB...',
+      '...BBBBBBBBBB...',
+      '....BBBBBBBB....',
+      '.....BB..BB.....',
+      '....BBB..BBB....',
+      '....KKK..KKK....',
+      '....KKK..KKK....',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................'
+    ],
+    run3: [
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '...RRRWWRRRRR...',
+      '...RRRWWRRRRR...',
+      '...RRRRRRRRRR...',
+      '....KKWWWWKK....',
+      '....KWWWWWWK....',
+      '....KKKWWKKK....',
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '....BBBBBBBB....',
+      '...BBBBBBBBBB...',
+      '...BBBBKKBBBB...',
+      '...BBBBBBBBBB...',
+      '....BBBBBBBB....',
+      '....BB....BB....',
+      '....BBB...BBB...',
+      '.....KKK..KKK...',
+      '.....KKK.KKK....',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................'
+    ],
+    jump: [
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '...RRRWWRRRRR...',
+      '...RRRWWRRRRR...',
+      '...RRRRRRRRRR...',
+      '....KKWWWWKK....',
+      '....KWWWWWWK....',
+      '....KKKWWKKK....',
+      '.....RRRRRR.....',
+      '....RRRRRRRR....',
+      '....BBBBBBBB....',
+      '...BBBBBBBBBB...',
+      '...BBBBKKBBBB...',
+      '...BBBBBBBBBB...',
+      '....BBBBBBBB....',
+      '.....BB..BB.....',
+      '.....BB..BB.....',
+      '....KKK..KKK....',
+      '....KKK..KKK....',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................'
+    ]
+  };
+
   class PlayerV2 {
     constructor(x, y) {
       this.x = x;
@@ -10,9 +155,16 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.width = 32;
       this.height = 52;
 
-      this.speed = 5;
+      // Física “clássica”: aceleração gradual + controle no ar
+      this.vx = 0;
+      this.vy = 0;
+      this.maxSpeed = 4.6;
+      this.accelGround = 0.62;
+      this.accelAir = 0.36;
+      this.frictionGround = 0.80;
+      this.frictionAir = 0.94;
+
       this.jumpForce = 15;
-      this.velocityY = 0;
       this.onGround = false;
 
       this.direction = 'right';
@@ -28,51 +180,92 @@ window.SuperBario99 = window.SuperBario99 || {};
       // Ataque
       this.attackCooldown = 0;
       this.attackTime = 0;
+
+      // squash & stretch (simples)
+      this.squashTimer = 0;
+      this.stretchTimer = 0;
     }
 
-    update(gravity, level, keys) {
+    update(gravity, level, keys, canvasHeight = 450) {
       if (this.invincibleTime > 0) this.invincibleTime--;
       if (this.attackCooldown > 0) this.attackCooldown--;
       if (this.attackTime > 0) this.attackTime--;
+      if (this.squashTimer > 0) this.squashTimer--;
+      if (this.stretchTimer > 0) this.stretchTimer--;
 
       this._isMoving = false;
 
-      // Movimento horizontal
-      if (keys['ArrowLeft']) {
-        this.x -= this.speed;
+      // Entrada
+      const left = !!keys['ArrowLeft'];
+      const right = !!keys['ArrowRight'];
+
+      // Movimento horizontal (aceleração)
+      const accel = this.onGround ? this.accelGround : this.accelAir;
+      if (left && !right) {
+        this.vx -= accel;
         this.direction = 'left';
         this._isMoving = true;
-      }
-      if (keys['ArrowRight']) {
-        this.x += this.speed;
+      } else if (right && !left) {
+        this.vx += accel;
         this.direction = 'right';
         this._isMoving = true;
+      } else {
+        // atrito
+        this.vx *= (this.onGround ? this.frictionGround : this.frictionAir);
+        if (Math.abs(this.vx) < 0.03) this.vx = 0;
       }
+
+      // clamp velocidade
+      if (this.vx > this.maxSpeed) this.vx = this.maxSpeed;
+      if (this.vx < -this.maxSpeed) this.vx = -this.maxSpeed;
 
       if (this._isMoving && this.onGround) this.walkTime++;
       else this.walkTime = 0;
 
-      // Gravidade
-      this.velocityY += gravity;
-      this.y += this.velocityY;
+      // ---- Integração + colisão por eixos (resolve “atravessar plataforma”) ----
 
-      // Colisão com plataformas (somente de cima para simplificar)
-      this.onGround = false;
+      // eixo X
+      this.x += this.vx;
       for (const p of level.platforms) {
-        if (this._collides(p)) {
-          if (this.velocityY > 0 && this.y + this.height <= p.y + 18) {
-            this.y = p.y - this.height;
-            this.velocityY = 0;
-            this.onGround = true;
-          }
+        if (!this._collides(p)) continue;
+        if (this.vx > 0) {
+          this.x = p.x - this.width;
+          this.vx = 0;
+        } else if (this.vx < 0) {
+          this.x = p.x + p.width;
+          this.vx = 0;
         }
       }
 
-      // chão
-      if (this.y > 450 - this.height) {
-        this.y = 450 - this.height;
-        this.velocityY = 0;
+      // eixo Y
+      this.vy += gravity;
+      this.y += this.vy;
+
+      const wasOnGround = this.onGround;
+      this.onGround = false;
+      for (const p of level.platforms) {
+        if (!this._collides(p)) continue;
+        if (this.vy > 0) {
+          this.y = p.y - this.height;
+          this.vy = 0;
+          this.onGround = true;
+        } else if (this.vy < 0) {
+          this.y = p.y + p.height;
+          this.vy = 0;
+        }
+      }
+
+      // chão do canvas (fallback)
+      const floorY = canvasHeight - this.height;
+      if (this.y > floorY) {
+        this.y = floorY;
+        this.vy = 0;
         this.onGround = true;
+      }
+
+      // squash ao aterrissar
+      if (!wasOnGround && this.onGround) {
+        this.squashTimer = 8;
       }
 
       // limites mundo
@@ -83,8 +276,9 @@ window.SuperBario99 = window.SuperBario99 || {};
 
     jump(audio) {
       if (this.onGround) {
-        this.velocityY = -this.jumpForce;
+        this.vy = -this.jumpForce;
         this.onGround = false;
+        this.stretchTimer = 8;
         if (audio) audio.playSfx('jump');
       }
     }
@@ -120,68 +314,64 @@ window.SuperBario99 = window.SuperBario99 || {};
       const x = this.x - cameraX;
       const y = this.y;
 
-      // Paleta (kimono muda levemente por tema)
-      let kimono = '#c0392b';
-      let kimonoShade = '#a93226';
-      let obi = '#f1c40f';
-      if (themeId === 'fruitiger') { kimono = '#4b6cb7'; kimonoShade = '#3b5a9a'; obi = '#dbe6ff'; }
-      if (themeId === 'tecnozen') { kimono = '#1a1f2b'; kimonoShade = '#0f1320'; obi = '#23d5ff'; }
-      if (themeId === 'dorfic') { kimono = '#2f2a24'; kimonoShade = '#1f1b17'; obi = '#3c6e47'; }
-      if (themeId === 'metro') { kimono = '#2b2f36'; kimonoShade = '#1f2329'; obi = '#4aa3ff'; }
-      if (themeId === 'evil') { kimono = '#1b0d12'; kimonoShade = '#12060b'; obi = '#ff3b2f'; }
-      if (themeId === 'memefusion') { kimono = '#3a2f5b'; kimonoShade = '#2a2044'; obi = '#ffd27d'; }
+      // squash & stretch (bem leve)
+      const squash = this.squashTimer > 0 ? (this.squashTimer / 8) : 0;
+      const stretch = this.stretchTimer > 0 ? (this.stretchTimer / 8) : 0;
+      const sx = 1 + squash * 0.10 - stretch * 0.04;
+      const sy = 1 - squash * 0.10 + stretch * 0.08;
 
-      // Pernas (animação simples)
-      const stride = this.onGround ? Math.sin(this.walkTime * 0.35) * 4 : 0;
-      ctx.fillStyle = '#2c2c2c';
-      ctx.fillRect(x + 8, y + 44, 6, 8 + Math.max(0, stride));
-      ctx.fillRect(x + 18, y + 44, 6, 8 + Math.max(0, -stride));
+      ctx.save();
+      ctx.translate(x + this.width / 2, y + this.height / 2);
+      ctx.scale(sx, sy);
+      ctx.translate(-(x + this.width / 2), -(y + this.height / 2));
 
-      // Corpo (kimono)
-      ctx.fillStyle = kimono;
-      ctx.fillRect(x + 6, y + 18, this.width - 12, this.height - 22);
-      ctx.fillStyle = kimonoShade;
-      ctx.fillRect(x + 6, y + 18, 10, this.height - 22);
+      // Seleção de frame
+      let frameName = 'idle';
+      if (!this.onGround) frameName = 'jump';
+      else if (this._isMoving) {
+        const idx = Math.floor((this.walkTime / 6) % 3);
+        frameName = (idx === 0) ? 'run1' : (idx === 1 ? 'run2' : 'run3');
+      }
 
-      // Obi
-      ctx.fillStyle = obi;
-      ctx.fillRect(x + 8, y + 36, this.width - 16, 7);
+      // Desenha sprite 8-bit (paleta limitada)
+      const flip = this.direction === 'left';
+      const scale = 2;
+      const frame = SPRITE[frameName] || SPRITE.idle;
+      const spriteH = frame.length;
+      const spriteW = frame[0] ? frame[0].length : 16;
+      const drawX0 = x + Math.floor((this.width - spriteW * scale) / 2);
+      // Alinha pelo último pixel visível (as matrizes têm linhas vazias no fim)
+      let visibleBottom = -1;
+      for (let row = 0; row < frame.length; row++) {
+        const line = frame[row];
+        // linha contém algum pixel desenhável?
+        for (let col = 0; col < line.length; col++) {
+          const ch = line[col];
+          if (ch !== '.' && ch !== ' ' && ch !== undefined) {
+            visibleBottom = row;
+            break;
+          }
+        }
+      }
+      const trimBottom = (visibleBottom >= 0) ? (frame.length - 1 - visibleBottom) : 0;
+      const drawY0 = y + (this.height - spriteH * scale) + (trimBottom * scale);
+      const palette = {
+        R: '#d12b2b',
+        B: '#2b63d1',
+        K: '#1b1b1b',
+        W: '#f5f6fa'
+      };
 
-      // Braços/mangas
-      ctx.fillStyle = kimonoShade;
-      ctx.fillRect(x - 2, y + 24, 10, 14);
-      ctx.fillRect(x + this.width - 8, y + 24, 10, 14);
-
-      // Cabeça (mais humana)
-      ctx.fillStyle = '#f2c9a0';
-      ctx.beginPath();
-      ctx.arc(x + 16, y + 12, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Cabelo + franja
-      ctx.fillStyle = '#1f1f1f';
-      ctx.beginPath();
-      ctx.arc(x + 16, y + 9, 12, Math.PI, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(x + 6, y + 2, 20, 6);
-
-      // Faixa/headband (anime)
-      ctx.fillStyle = themeId === 'tecnozen' ? '#23d5ff' : 'rgba(255,255,255,0.75)';
-      ctx.fillRect(x + 6, y + 7, 20, 3);
-
-      // Olhos (menos "quadradão")
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x + 9, y + 11, 6, 4);
-      ctx.fillRect(x + 17, y + 11, 6, 4);
-      ctx.fillStyle = themeId === 'evil' ? '#ff3b2f' : '#2e86de';
-      ctx.fillRect(x + 11, y + 12, 3, 2);
-      ctx.fillRect(x + 19, y + 12, 3, 2);
-
-      // Nariz/boca discretos
-      ctx.fillStyle = 'rgba(44,62,80,0.65)';
-      ctx.fillRect(x + 15, y + 16, 2, 1);
-      ctx.fillStyle = 'rgba(142,68,173,0.55)';
-      ctx.fillRect(x + 14, y + 18, 4, 1);
+      for (let row = 0; row < frame.length; row++) {
+        const line = frame[row];
+        for (let col = 0; col < line.length; col++) {
+          const ch = line[col];
+          if (ch === '.' || !palette[ch]) continue;
+          const drawCol = flip ? (line.length - 1 - col) : col;
+          ctx.fillStyle = palette[ch];
+          ctx.fillRect(drawX0 + drawCol * scale, drawY0 + row * scale, scale, scale);
+        }
+      }
 
       // Espada no ataque
       const hit = this.getAttackHitbox();
@@ -194,13 +384,29 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.lineTo(hx + (this.direction === 'right' ? hit.width : 0), hit.y);
         ctx.stroke();
 
-        // rastro do golpe
-        ctx.strokeStyle = themeId === 'evil' ? 'rgba(255,59,47,0.35)' : 'rgba(255,255,255,0.25)';
+        // rastro do golpe (aceita themeId antigo e aestheticId novo)
+        const id = themeId || '';
+        const isEvil = (id === 'evil');
+        const isVapor = (id === 'vaporwave');
+        const isTecno = (id === 'tecnozen' || id === 'tecno-zen');
+        const isAurora = (id === 'aurora-aero');
+        const isFruit = (id === 'fruitiger' || id === 'fruitiger-aero');
+        const isMetro = (id === 'metro' || id === 'metro-aero');
+
+        if (isVapor) ctx.strokeStyle = 'rgba(255,0,255,0.35)';
+        else if (isTecno) ctx.strokeStyle = 'rgba(0,255,255,0.30)';
+        else if (isAurora) ctx.strokeStyle = 'rgba(255,215,0,0.28)';
+        else if (isFruit) ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+        else if (isMetro) ctx.strokeStyle = 'rgba(0,191,255,0.22)';
+        else if (isEvil) ctx.strokeStyle = 'rgba(255,59,47,0.35)';
+        else ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.arc(x + 16 + (this.direction === 'right' ? 18 : -18), y + 28, 18, -0.9, 0.9);
         ctx.stroke();
       }
+
+      ctx.restore();
     }
 
     _collides(obj) {

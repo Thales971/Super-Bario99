@@ -3,8 +3,9 @@ window.SuperBario99 = window.SuperBario99 || {};
 
 (function () {
   function getBlock(levelIndex) {
-    // levelIndex: 0..34
-    return Math.floor(levelIndex / 5); // 0..6
+    // levelIndex: 0..49
+    const i = Math.max(0, levelIndex | 0);
+    return Math.floor(i / 5); // 0..9
   }
 
   function getThemeId(levelIndex) {
@@ -16,6 +17,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       'dorfic',
       'metro',
       'evil',
+      'memefusion',
+      'metro',
+      'evil',
       'memefusion'
     ][block] || 'japan';
   }
@@ -24,7 +28,7 @@ window.SuperBario99 = window.SuperBario99 || {};
     const block = getBlock(levelIndex);
     const within = levelIndex % 5;
 
-    const tier = block <= 1 ? 'basic' : (block <= 4 ? 'intermediate' : 'advanced');
+    const tier = block <= 1 ? 'basic' : (block <= 5 ? 'intermediate' : 'advanced');
 
     const base = {
       basic: { enemySpeed: 1.0, reaction: 0.35, spawnExtra: 0 },

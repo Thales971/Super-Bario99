@@ -1,10 +1,69 @@
-// Boss por tema (v2): um boss no fim de cada bloco (5,10,15,20,25,30,35)
+// Boss por tema (v2): um boss no fim de cada bloco (5,10,15,20,25,30,35,40,45,50)
 // Mantém tudo em Canvas shapes.
 
 window.SuperBario99 = window.SuperBario99 || {};
 
 (function () {
   const util = SuperBario99.util;
+
+  const SPRITE = {
+    idle: [
+      '........HHHHHHHH........',
+      '.......HAAAAAAAAAAH......',
+      '......AAEEEE..EEEEAA.....',
+      '......AAEEEE..EEEEAA.....',
+      '......AAAAAAAAAAAAAA.....',
+      '.....AAAAAAFFFFAAAAAA....',
+      '....AAABBBBBBBBBBBAAA....',
+      '....AABBBBBBBBBBBBBAA....',
+      '....AABBBCCCCCCCCBBAA....',
+      '....AABBBCCCCCCCCBBAA....',
+      '.....AABBBBBBBBBBAA......',
+      '......AABBBBBBBBAA.......',
+      '.......AABBBBBBAA........',
+      '.......PPBBBBBBPP........',
+      '......PPPBBBBBBPPP.......',
+      '......PP..BBBB..PP.......',
+      '......PP..BBBB..PP.......',
+      '.....PPP..PPPP..PPP......',
+      '.....PP...PPPP...PP......'
+    ]
+  };
+
+  function _drawPixelSprite(ctx, sprite, x, y, boxW, boxH, palette, flip) {
+    const h = sprite.length;
+    const w = sprite[0] ? sprite[0].length : 0;
+    if (!w || !h) return;
+
+    const scale = Math.max(1, Math.min(Math.floor(boxW / w), Math.floor(boxH / h)));
+
+    let visibleBottom = -1;
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        if (ch !== '.' && ch !== ' ') { visibleBottom = row; break; }
+      }
+    }
+    const trimBottom = (visibleBottom >= 0) ? (h - 1 - visibleBottom) : 0;
+
+    const drawW = w * scale;
+    const drawH = h * scale;
+    const x0 = x + Math.floor((boxW - drawW) / 2);
+    const y0 = y + (boxH - drawH) + (trimBottom * scale);
+
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        const color = palette[ch];
+        if (!color) continue;
+        const drawCol = flip ? (w - 1 - col) : col;
+        ctx.fillStyle = color;
+        ctx.fillRect(x0 + drawCol * scale, y0 + row * scale, scale, scale);
+      }
+    }
+  }
 
   class ThemeBoss {
     constructor(x, y, themeId, levelIndex) {
@@ -26,7 +85,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.timer = 0;
       this.hitIFrames = 0;
 
-      this.maxHp = 14 + Math.floor(levelIndex / 5) * 4;
+      const block = Math.floor(levelIndex / 5);
+      this.maxHp = 22 + block * 7;
       this.hp = this.maxHp;
 
       this.projectiles = [];
@@ -41,7 +101,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (this.shootCooldown > 0) this.shootCooldown--;
       if (this.dashCooldown > 0) this.dashCooldown--;
 
-      const speedBase = 1.1 * diff.enemySpeed;
+      const hpRatio = this.maxHp > 0 ? (this.hp / this.maxHp) : 1;
+      const enrage = hpRatio <= 0.5;
+      const speedBase = (1.35 * diff.enemySpeed) * (enrage ? 1.22 : 1.0);
       const toward = player.x < this.x ? -1 : 1;
 
       // Padrões simples por tema
@@ -53,14 +115,15 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       // Dash periódico
       if (wantsDash && this.dashCooldown <= 0 && Math.abs(player.x - this.x) < 420) {
-        this.vx = toward * speedBase * 5.2;
-        this.dashCooldown = 95;
+        this.vx = toward * speedBase * (enrage ? 7.0 : 6.2);
+        this.dashCooldown = enrage ? 60 : 78;
       }
 
       // Tiro (projéteis)
       if (wantsShots && this.shootCooldown <= 0) {
         this._shootAt(player);
-        this.shootCooldown = this.themeId === 'evil' ? 45 : 60;
+        const baseCd = this.themeId === 'evil' ? 32 : 44;
+        this.shootCooldown = enrage ? Math.max(22, baseCd - 10) : baseCd;
       }
 
       // Física
@@ -88,7 +151,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
     _shootAt(player) {
       const dir = player.x < this.x ? -1 : 1;
-      const baseVx = dir * (3.2 + Math.min(2.2, this.levelIndex / 18));
+      const baseVx = dir * (4.2 + Math.min(3.4, this.levelIndex / 14));
 
       const style = this.themeId;
       const colorByStyle = {
@@ -102,9 +165,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       };
 
       // padrão: 1~3 tiros
-      const count = this.themeId === 'evil' ? 3 : (this.themeId === 'memefusion' ? 2 : 1);
+      const count = this.themeId === 'evil' ? 4 : (this.themeId === 'memefusion' ? 3 : 2);
       for (let i = 0; i < count; i++) {
-        const vy = -1.2 + i * 1.2;
+        const vy = -1.6 + i * 1.25;
         this.projectiles.push({
           x: this.x + (dir === 1 ? this.width : -6),
           y: this.y + 26,
@@ -145,9 +208,9 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       if (this._collides(player)) {
         // stomp: dano, não mata de primeira
-        if (player.velocityY > 0 && player.y + player.height < this.y + this.height * 0.45) {
+        if (player.vy > 0 && player.y + player.height < this.y + this.height * 0.45) {
           this.takeDamage(2);
-          player.velocityY = -12;
+          player.vy = -12;
           player.score += 180;
           return false;
         }
@@ -174,36 +237,56 @@ window.SuperBario99 = window.SuperBario99 || {};
       const x = this.x - cameraX;
       const y = this.y;
 
-      // Corpo (bem grande) + “máscara” por tema
+      const id = (themeId || this.themeId || 'japan');
+      const v = (id === 'fruitiger-aero') ? 'fruitiger'
+        : (id === 'metro-aero') ? 'metro'
+        : (id === 'tecno-zen') ? 'tecnozen'
+        : (id === 'windows-xp') ? 'windows-xp'
+        : (id === 'windows-vista') ? 'windows-vista'
+        : (id === 'vaporwave') ? 'vaporwave'
+        : (id === 'aurora-aero') ? 'aurora-aero'
+        : id;
+
+      // Boss humanoide (pixel art) + máscara por tema
       let body = '#2c2c2c';
       let accent = '#f5f6fa';
-      if (themeId === 'japan') { body = '#c0392b'; accent = '#f5f6fa'; }
-      if (themeId === 'fruitiger') { body = '#4b6cb7'; accent = '#dbe6ff'; }
-      if (themeId === 'tecnozen') { body = '#1a1f2b'; accent = '#23d5ff'; }
-      if (themeId === 'dorfic') { body = '#2f2a24'; accent = '#3c6e47'; }
-      if (themeId === 'metro') { body = '#2b2f36'; accent = '#4aa3ff'; }
-      if (themeId === 'evil') { body = '#1b0d12'; accent = '#ff3b2f'; }
-      if (themeId === 'memefusion') { body = '#3a2f5b'; accent = '#ffd27d'; }
+      if (v === 'japan') { body = '#c0392b'; accent = '#f5f6fa'; }
+      if (v === 'fruitiger') { body = '#4b6cb7'; accent = '#dbe6ff'; }
+      if (v === 'tecnozen') { body = '#1a1f2b'; accent = '#00FFFF'; }
+      if (v === 'dorfic') { body = '#2f2a24'; accent = '#3c6e47'; }
+      if (v === 'metro') { body = '#2b2f36'; accent = '#4aa3ff'; }
+      if (v === 'evil') { body = '#1b0d12'; accent = '#ff3b2f'; }
+      if (v === 'memefusion') { body = '#3a2f5b'; accent = '#ffd27d'; }
+      if (v === 'windows-xp') { body = '#0055E5'; accent = '#ECE9D8'; }
+      if (v === 'windows-vista') { body = 'rgba(0,120,215,0.78)'; accent = 'rgba(255,255,255,0.65)'; }
+      if (v === 'vaporwave') { body = '#141018'; accent = '#FF00FF'; }
+      if (v === 'aurora-aero') { body = '#0d1020'; accent = '#FFD700'; }
 
-      // base
-      ctx.fillStyle = body;
-      ctx.fillRect(x, y + 10, this.width, this.height - 10);
-      ctx.fillStyle = accent;
-      ctx.fillRect(x + 10, y + 22, this.width - 20, 10);
+      const cloak = 'rgba(0,0,0,0.22)';
+      const boots = 'rgba(0,0,0,0.35)';
+      const eye = (v === 'evil') ? '#ff3b2f' : (v === 'aurora-aero' ? '#FFD700' : (v === 'vaporwave' ? '#00FFFF' : '#2e86de'));
 
-      // “cabeça”
-      ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.arc(x + this.width * 0.5, y + 16, 16, 0, Math.PI * 2);
-      ctx.fill();
+      const palette = {
+        H: cloak,
+        A: accent,
+        B: body,
+        C: 'rgba(255,255,255,0.08)',
+        E: eye,
+        F: 'rgba(0,0,0,0.18)',
+        P: boots
+      };
 
-      // olhos
-      ctx.fillStyle = themeId === 'evil' ? '#ff3b2f' : '#2e86de';
-      ctx.fillRect(x + 26, y + 14, 10, 6);
-      ctx.fillRect(x + 48, y + 14, 10, 6);
+      const flip = (this.vx < 0);
+      _drawPixelSprite(ctx, SPRITE.idle, x, y, this.width, this.height, palette, flip);
 
       // aura (pulso)
-      ctx.strokeStyle = themeId === 'tecnozen' ? 'rgba(35,213,255,0.35)' : 'rgba(255,255,255,0.18)';
+      ctx.strokeStyle = (v === 'tecnozen')
+        ? 'rgba(0,255,255,0.35)'
+        : (v === 'vaporwave')
+          ? 'rgba(255,0,255,0.28)'
+          : (v === 'aurora-aero')
+            ? 'rgba(127,255,0,0.20)'
+            : 'rgba(255,255,255,0.18)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(x + this.width / 2, y + this.height / 2, 40 + (this.timer % 14), 0, Math.PI * 2);
@@ -224,7 +307,10 @@ window.SuperBario99 = window.SuperBario99 || {};
       const by = 54;
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.fillRect(bx, by, barW, barH);
-      ctx.fillStyle = themeId === 'evil' ? 'rgba(255,59,47,0.9)' : 'rgba(255,210,125,0.9)';
+      ctx.fillStyle = (v === 'evil') ? 'rgba(255,59,47,0.9)'
+        : (v === 'aurora-aero') ? 'rgba(255,215,0,0.85)'
+          : (v === 'vaporwave') ? 'rgba(255,0,255,0.80)'
+            : 'rgba(255,210,125,0.9)';
       ctx.fillRect(bx, by, Math.floor(barW * (this.hp / this.maxHp)), barH);
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.strokeRect(bx, by, barW, barH);

@@ -6,7 +6,7 @@ Um jogo de plataforma 2D desenvolvido inteiramente em **HTML5 Canvas e JavaScrip
 
 ## 🎮 Funcionalidades Principais
 
-- **35 Fases Procedurais**: Níveis gerados algoritmicamente que aumentam em tamanho e dificuldade.
+- **50 Fases Procedurais**: Níveis gerados algoritmicamente que aumentam em tamanho e dificuldade.
 - **7 Temas Estéticos**: Cada bloco de 5 fases possui uma identidade visual e sonora única:
   1.  _Japan Retro_ (Sakuras, Templos, Fuji)
   2.  _Fruitiger Aero_ (Glossy, Céu Azul, Otimismo Tech)
@@ -44,6 +44,55 @@ Não é necessário instalar dependências de node_modules. O jogo roda nativame
     - `http://localhost:5500`
 
 ## 📂 Estrutura do Código (v2)
+
+## 🎨 Sistema de Estéticas (Theme Manager)
+
+O jogo aplica automaticamente uma estética visual por fase (1–50) usando o arquivo:
+
+- [js/themes/theme-manager.js](js/themes/theme-manager.js)
+
+### Mapeamento padrão por bloco
+
+- Fases 1–5: **Windows XP** (`windows-xp`)
+- Fases 6–10: **Fruitiger Aero** (`fruitiger-aero`)
+- Fases 11–15: **Tecno Zen** (`tecno-zen`)
+- Fases 16–20: **Dorfic** (`dorfic`)
+- Fases 21–25: **Metro Aero** (`metro-aero`)
+- Fases 26–30: **Vaporwave** (`vaporwave`)
+- Fases 31–35: **Aurora Aero** (`aurora-aero`)
+- Fases 36–40: **Windows Vista** (`windows-vista`)
+- Fases 41–45: **Vaporwave** (`vaporwave`)
+- Fases 46–50: **Aurora Aero** (`aurora-aero`)
+
+### Como adicionar uma nova estética
+
+1. Adicione uma entrada em `THEMES` dentro de [js/themes/theme-manager.js](js/themes/theme-manager.js) (paleta, UI e efeitos).
+2. Opcional: adicione suporte de overlay em `drawOverlay()` (scanlines/glitch/glow).
+3. (Se quiser aplicar por fase) ajuste `getAestheticIdForLevel(levelIndex)`.
+
+O Theme Manager aplica o visual principalmente via **CSS Variables** (tipografia, blur, radius, etc.) e usa um **overlay Canvas** leve para efeitos (scanlines/glitch).
+
+## 🧪 Modo Livre / Criativo
+
+No menu principal existe o botão **MODO LIVRE**. Ele abre um painel onde você escolhe:
+
+- Fase inicial (1–50)
+- Estética (override)
+- Intensidade de efeitos
+- Quantidade/pool de inimigos
+- Gravidade e vidas
+
+### Slots (10)
+
+Você pode salvar e carregar setups em **10 slots** (localStorage). Cada slot guarda também uma miniatura do preview.
+
+### Compartilhamento (código)
+
+- **Gerar Código** cria um código `SB99-...` com o setup.
+- **Importar Código** aplica o setup.
+- Também dá para abrir direto via URL com `#free=SB99-...`.
+
+> Observação: o Modo Livre **não** altera o save nem o recorde do modo principal.
 
 O projeto migrou para uma arquitetura modular baseada em namespaces (`window.SuperBario99`) para garantir compatibilidade simples.
 

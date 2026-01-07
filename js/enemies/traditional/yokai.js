@@ -2,6 +2,76 @@
 window.SuperBario99 = window.SuperBario99 || {};
 
 (function () {
+  const SPRITE = {
+    idle: [
+      '....HHHHHH....',
+      '...HGGGGGGH...',
+      '...GEE..EEG...',
+      '...GEE..EEG...',
+      '...GGGGGGGG...',
+      '..GGGGGGGGGG..',
+      '..GGGMMMMGGG..',
+      '....GGGGGG....',
+      '...GGGGGGGG...',
+      '...GGGGGGGG...',
+      '...PPGGGGPP...',
+      '...PPGGGGPP...',
+      '....PP..PP....',
+      '....PP..PP....'
+    ],
+    float: [
+      '....HHHHHH....',
+      '...HGGGGGGH...',
+      '...GEE..EEG...',
+      '...GEE..EEG...',
+      '...GGGGGGGG...',
+      '..GGGGGGGGGG..',
+      '..GGGMMMMGGG..',
+      '....GGGGGG....',
+      '...GGGGGGGG...',
+      '...GGGGGGGG...',
+      '....PP..PP....',
+      '...PP....PP...',
+      '..............',
+      '..............'
+    ]
+  };
+
+  function _drawPixelSprite(ctx, sprite, x, y, boxW, boxH, palette, flip) {
+    const h = sprite.length;
+    const w = sprite[0] ? sprite[0].length : 0;
+    if (!w || !h) return;
+
+    const scale = Math.max(1, Math.min(Math.floor(boxW / w), Math.floor(boxH / h)));
+
+    let visibleBottom = -1;
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        if (ch !== '.' && ch !== ' ') { visibleBottom = row; break; }
+      }
+    }
+    const trimBottom = (visibleBottom >= 0) ? (h - 1 - visibleBottom) : 0;
+
+    const drawW = w * scale;
+    const drawH = h * scale;
+    const x0 = x + Math.floor((boxW - drawW) / 2);
+    const y0 = y + (boxH - drawH) + (trimBottom * scale);
+
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        const color = palette[ch];
+        if (!color) continue;
+        const drawCol = flip ? (w - 1 - col) : col;
+        ctx.fillStyle = color;
+        ctx.fillRect(x0 + drawCol * scale, y0 + row * scale, scale, scale);
+      }
+    }
+  }
+
   class Yokai {
     constructor(x, y) {
       this.x = x;
@@ -47,9 +117,13 @@ window.SuperBario99 = window.SuperBario99 || {};
           const s = SuperBario99.pathfinding.toCell(grid, this.x, this.y);
           const g = SuperBario99.pathfinding.toCell(grid, player.x, player.y);
 
-          const path = SuperBario99.pathfinding.findPath(grid, s, g, 1600);
+          const maxIter = diff.tier === 'advanced' ? 1400 : 1000;
+          const path = SuperBario99.pathfinding.findPath(grid, s, g, maxIter);
           this.path = path;
           this.pathIndex = 0;
+
+          // Se falhou, diminui a frequência para evitar "lag em massa"
+          if (!this.path) this.repathTimer = Math.max(this.repathTimer, 110);
         }
       }
 
@@ -99,9 +173,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!this.alive) return false;
       if (this._collides(player)) {
         // Yokai pode ser morto pulando (exceto em advanced: precisa ataque)
-        if (player.velocityY > 0 && player.y + player.height < this.y + this.height * 0.5) {
+        if (player.vy > 0 && player.y + player.height < this.y + this.height * 0.5) {
           this.die();
-          player.velocityY = -10;
+          player.vy = -10;
           player.score += 200;
           return false;
         }
@@ -123,21 +197,43 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!this.alive) return;
       const x = this.x - cameraX;
 
-      // corpo espectral
-      ctx.fillStyle = themeId === 'evil' ? 'rgba(255,59,47,0.9)' : 'rgba(155,89,182,0.9)';
-      ctx.beginPath();
-      ctx.arc(x + 15, this.y + 16, 14, 0, Math.PI * 2);
-      ctx.fill();
+      const id = (themeId || 'japan');
+      const v = (id === 'fruitiger-aero') ? 'fruitiger'
+        : (id === 'metro-aero') ? 'metro'
+        : (id === 'tecno-zen') ? 'tecnozen'
+        : (id === 'windows-xp') ? 'windows-xp'
+        : (id === 'windows-vista') ? 'windows-vista'
+        : (id === 'vaporwave') ? 'vaporwave'
+        : (id === 'aurora-aero') ? 'aurora-aero'
+        : id;
 
-      ctx.fillRect(x + 2, this.y + 16, 26, 20);
+      // corpo espectral (paleta)
+      let ghost = 'rgba(155,89,182,0.70)';
+      if (v === 'evil') ghost = 'rgba(255,59,47,0.55)';
+      else if (v === 'vaporwave') ghost = 'rgba(255,0,255,0.45)';
+      else if (v === 'tecnozen') ghost = 'rgba(0,255,255,0.32)';
+      else if (v === 'aurora-aero') ghost = 'rgba(127,255,0,0.28)';
+      else if (v === 'windows-xp') ghost = 'rgba(0,85,229,0.26)';
+      else if (v === 'windows-vista') ghost = 'rgba(0,120,215,0.24)';
+      else if (v === 'metro') ghost = 'rgba(74,163,255,0.26)';
+      else if (v === 'fruitiger') ghost = 'rgba(111,231,255,0.26)';
 
-      // olhos
-      ctx.fillStyle = '#f5f6fa';
-      ctx.fillRect(x + 9, this.y + 14, 4, 4);
-      ctx.fillRect(x + 18, this.y + 14, 4, 4);
-      ctx.fillStyle = '#2c3e50';
-      ctx.fillRect(x + 10, this.y + 15, 2, 2);
-      ctx.fillRect(x + 19, this.y + 15, 2, 2);
+      const palette = {
+        H: 'rgba(255,255,255,0.10)',
+        G: ghost,
+        E: 'rgba(245,246,250,0.90)',
+        M: 'rgba(0,0,0,0.28)',
+        P: ghost
+      };
+
+      const flip = this.vx < 0;
+      const frame = (Math.abs(this.vy) > 0.35 && !this.onGround) ? SPRITE.float : SPRITE.idle;
+
+      // leve aura
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(x - 6, this.y - 4, this.width + 12, this.height + 8);
+
+      _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
     }
 
     _collides(obj) {

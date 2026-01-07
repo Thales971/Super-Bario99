@@ -13,13 +13,31 @@
         <div id="level-display">Fase: 1</div>
         <div id="best-display">Recorde: 0</div>
         <button id="mute-btn" aria-pressed="false" title="Silenciar">🔊</button>
+
+        <!-- Controles touch (aparece automaticamente em dispositivos móveis) -->
+        <div id="touch-controls" aria-hidden="true" style="display: none;">
+            <div class="touch-left">
+                <button id="touch-left" class="touch-btn" aria-label="Mover para esquerda">◀</button>
+                <button id="touch-right" class="touch-btn" aria-label="Mover para direita">▶</button>
+            </div>
+            <div class="touch-right">
+                <button id="touch-jump" class="touch-btn" aria-label="Pular">⬆</button>
+                <button id="touch-attack" class="touch-btn" aria-label="Atacar">X</button>
+            </div>
+        </div>
     </div>
     
     <div id="menu">
-        <h1>SUPER-BARIO99</h1>
-        <button id="continue-btn" style="display: none;">CONTINUAR</button>
-        <button id="start-btn">NOVO JOGO</button>
-        <button id="instructions-btn">INSTRUÇÕES</button>
+        <div class="menu-card" role="dialog" aria-label="Menu inicial">
+            <h1>SUPER-BARIO99</h1>
+            <div class="menu-sub">50 fases • boss a cada 5 • 10 vidas</div>
+            <div class="menu-actions" aria-label="Ações do menu">
+                <button id="continue-btn" style="display: none;">CONTINUAR</button>
+                <button id="start-btn">NOVO JOGO</button>
+                <button id="free-mode-btn">MODO LIVRE</button>
+                <button id="instructions-btn">INSTRUÇÕES</button>
+            </div>
+        </div>
     </div>
     
     <div id="instructions" style="display: none;">
@@ -39,8 +57,150 @@
         <button id="menu-btn">MENU</button>
     </div>
 
+    <!-- Modo Livre / Criativo -->
+    <div id="free-mode" aria-hidden="true" data-panel="left" data-simple="true">
+        <div class="fm-header">
+            <div class="fm-title">MODO LIVRE</div>
+            <button id="free-mode-close" class="fm-close" aria-label="Fechar Modo Livre">VOLTAR</button>
+        </div>
+
+        <!-- Abas no mobile -->
+        <div class="fm-tabs" role="tablist" aria-label="Abas do Modo Livre">
+            <button class="fm-tab" id="fm-tab-config" role="tab" aria-selected="true">Configurar</button>
+            <button class="fm-tab" id="fm-tab-preview" role="tab" aria-selected="false">Preview</button>
+        </div>
+
+        <div class="fm-body">
+            <div class="fm-left" aria-label="Configurações do Modo Livre">
+                <div class="fm-categories">
+                    <div class="fm-section-title">Categorias</div>
+                    <div class="fm-grid" aria-label="Categorias">
+                        <div class="fm-card" data-scroll="fm-section-stage"><strong>Fases</strong><div>Escolha a fase e o modo de seleção.</div></div>
+                        <div class="fm-card" data-scroll="fm-section-aesthetic"><strong>Estéticas</strong><div>Escolha a identidade visual.</div></div>
+                        <div class="fm-card" data-scroll="fm-section-enemies"><strong>Inimigos</strong><div>Controle quantidade e tipos.</div></div>
+                        <div class="fm-card" data-scroll="fm-section-diff"><strong>Dificuldade</strong><div>Gravidade e velocidade.</div></div>
+                        <div class="fm-card" data-scroll="fm-section-presets"><strong>Presets</strong><div>Relaxante, Clássico, Difícil...</div></div>
+                        <div class="fm-card" data-scroll="fm-section-save"><strong>Salvar</strong><div>Slots e miniaturas.</div></div>
+                        <div class="fm-card" data-scroll="fm-section-share"><strong>Compartilhar</strong><div>Gerar e importar código.</div></div>
+                        <div class="fm-card" data-scroll="fm-section-play"><strong>Jogar</strong><div>Iniciar com as configs.</div></div>
+                        <div class="fm-card"><strong>Acessível</strong><div>Compatível com toque e leitor.</div></div>
+                    </div>
+                </div>
+
+                <div id="fm-section-stage" class="fm-section-title">Seleção de Fase</div>
+                <label>
+                    Modo de seleção
+                    <select id="fm-stage-mode" aria-label="Modo de seleção de fase">
+                        <option value="classic">Modo Clássico (1-50)</option>
+                        <option value="random10">Modo Aleatório (10 fases)</option>
+                        <option value="creator">Modo Criador (sequência)</option>
+                        <option value="challenge">Modo Desafio (por dificuldade)</option>
+                    </select>
+                </label>
+                <label>
+                    Fase inicial
+                    <select id="fm-stage" aria-label="Selecionar fase inicial"></select>
+                </label>
+
+                <div id="fm-section-aesthetic" class="fm-section-title">Estética</div>
+                <label>
+                    Estética
+                    <select id="fm-aesthetic" aria-label="Selecionar estética"></select>
+                </label>
+                <label>
+                    Intensidade do efeito (0-100)
+                    <input id="fm-effect" type="range" min="0" max="100" value="80" aria-label="Intensidade dos efeitos" />
+                </label>
+
+                <div id="fm-section-enemies" class="fm-section-title">Inimigos</div>
+                <label>
+                    Quantidade (0-50)
+                    <input id="fm-enemy-count" type="range" min="0" max="50" value="14" aria-label="Quantidade de inimigos" />
+                </label>
+                <label>
+                    Comportamento
+                    <select id="fm-enemy-behavior" aria-label="Comportamento padrão">
+                        <option value="random">Aleatório</option>
+                        <option value="aggressive">Agressivo</option>
+                        <option value="defensive">Defensivo</option>
+                    </select>
+                </label>
+                <label>
+                    Pool de inimigos
+                    <select id="fm-enemy-pool" aria-label="Pool de inimigos"></select>
+                </label>
+
+                <div id="fm-section-diff" class="fm-section-title">Dificuldade</div>
+                <label>
+                    Gravidade
+                    <select id="fm-gravity" aria-label="Gravidade">
+                        <option value="0.6">Baixa</option>
+                        <option value="0.8" selected>Normal</option>
+                        <option value="1.05">Alta</option>
+                        <option value="1.25">Máxima</option>
+                    </select>
+                </label>
+                <label>
+                    Vidas
+                    <select id="fm-lives" aria-label="Vidas">
+                        <option value="inf">Infinitas</option>
+                        <option value="10" selected>10</option>
+                        <option value="3">3</option>
+                        <option value="1">1</option>
+                    </select>
+                </label>
+
+                <div id="fm-section-presets" class="fm-section-title">Presets</div>
+                <div class="fm-actions">
+                    <button id="fm-preset-relax">Modo Relaxante</button>
+                    <button id="fm-preset-classic">Modo Clássico</button>
+                    <button id="fm-preset-hard">Modo Difícil</button>
+                    <button id="fm-preset-impossible">Modo Impossível</button>
+                </div>
+
+                <div id="fm-section-save" class="fm-section-title">Salvar (10 slots)</div>
+                <label>
+                    Nome do slot
+                    <input id="fm-slot-name" type="text" placeholder="Meu setup" aria-label="Nome do setup" />
+                </label>
+                <label>
+                    Slot
+                    <select id="fm-slot" aria-label="Slot de salvamento"></select>
+                </label>
+                <div class="fm-actions">
+                    <button id="fm-save">Salvar</button>
+                    <button id="fm-load">Carregar</button>
+                </div>
+
+                <div id="fm-section-share" class="fm-section-title">Compartilhar</div>
+                <label>
+                    Código
+                    <input id="fm-share-code" type="text" placeholder="SB99-..." aria-label="Código de compartilhamento" />
+                </label>
+                <div class="fm-actions">
+                    <button id="fm-generate">Gerar Código</button>
+                    <button id="fm-import">Importar Código</button>
+                </div>
+
+                <div id="fm-section-play" class="fm-section-title">Jogar</div>
+                <div class="fm-actions">
+                    <button id="fm-play">JOGAR</button>
+                </div>
+            </div>
+
+            <div class="fm-right" aria-label="Preview do Modo Livre">
+                <div class="fm-section-title">Pré-visualização</div>
+                <canvas id="preview-canvas" class="fm-preview" width="300" height="180" aria-label="Canvas de preview"></canvas>
+                <div style="margin-top: 10px; font-size: 14px; opacity: 0.9;">
+                    O preview atualiza conforme você muda as opções.
+                </div>
+            </div>
+        </div>
+    </div>
+
         <!-- V2 (modular, sem ES Modules) -->
         <script src="js/core/globals.js"></script>
+        <script src="js/themes/theme-manager.js"></script>
         <script src="js/core/audio-manager.js"></script>
         <script src="js/ai/difficulty-system.js"></script>
         <script src="js/ai/pathfinding.js"></script>
@@ -53,11 +213,13 @@
         <script src="js/enemies/traditional/drone.js"></script>
         <script src="js/enemies/bosses/theme-boss.js"></script>
         <script src="js/core/player.js"></script>
+        <script src="js/modes/free-mode.js"></script>
         <script src="js/core/game.js"></script>
         <script>
             // Boot v2
             (function () {
                 const game = new SuperBario99.GameV2();
+                SuperBario99.__game = game; // referência global (usada pelo Modo Livre)
                 game.init();
             })();
         </script>

@@ -2,6 +2,55 @@
 window.SuperBario99 = window.SuperBario99 || {};
 
 (function () {
+  const SPRITE = {
+    idle: [
+      '..HHHH..',
+      '.HBBBBH.',
+      '.BEEEBB.',
+      '.BEEEBB.',
+      '.BBBBBB.',
+      '..BBBB..',
+      '.BBCCBB.',
+      '.BBCCBB.',
+      '..PPPP..'
+    ]
+  };
+
+  function _drawPixelSprite(ctx, sprite, x, y, boxW, boxH, palette, flip) {
+    const h = sprite.length;
+    const w = sprite[0] ? sprite[0].length : 0;
+    if (!w || !h) return;
+
+    const scale = Math.max(1, Math.min(Math.floor(boxW / w), Math.floor(boxH / h)));
+
+    let visibleBottom = -1;
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        if (ch !== '.' && ch !== ' ') { visibleBottom = row; break; }
+      }
+    }
+    const trimBottom = (visibleBottom >= 0) ? (h - 1 - visibleBottom) : 0;
+
+    const drawW = w * scale;
+    const drawH = h * scale;
+    const x0 = x + Math.floor((boxW - drawW) / 2);
+    const y0 = y + (boxH - drawH) + (trimBottom * scale);
+
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        const color = palette[ch];
+        if (!color) continue;
+        const drawCol = flip ? (w - 1 - col) : col;
+        ctx.fillStyle = color;
+        ctx.fillRect(x0 + drawCol * scale, y0 + row * scale, scale, scale);
+      }
+    }
+  }
+
   class Drone {
     constructor(x, y) {
       this.x = x;
@@ -13,6 +62,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       this.timer = 0;
       this.baseY = y;
+      this.direction = 1;
     }
 
     update(level, player, diff) {
@@ -21,6 +71,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       const speed = 1.35 * diff.enemySpeed;
       const dir = player.x < this.x ? -1 : 1;
+      this.direction = dir;
       this.x += dir * speed;
 
       // flutuação
@@ -35,9 +86,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!this.alive) return false;
       if (this._collides(player)) {
         // stomp
-        if (player.velocityY > 0 && player.y + player.height < this.y + this.height * 0.65) {
+        if (player.vy > 0 && player.y + player.height < this.y + this.height * 0.65) {
           this.die();
-          player.velocityY = -10;
+          player.vy = -10;
           player.score += 130;
           return false;
         }
@@ -59,23 +110,42 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!this.alive) return;
       const x = this.x - cameraX;
 
-      const base = themeId === 'tecnozen' ? '#23d5ff' : (themeId === 'metro' ? '#4aa3ff' : '#dfe6e9');
-      ctx.fillStyle = base;
-      ctx.fillRect(x, this.y, this.width, this.height);
+      const id = (themeId || 'japan');
+      const v = (id === 'fruitiger-aero') ? 'fruitiger'
+        : (id === 'metro-aero') ? 'metro'
+        : (id === 'tecno-zen') ? 'tecnozen'
+        : (id === 'windows-xp') ? 'windows-xp'
+        : (id === 'windows-vista') ? 'windows-vista'
+        : (id === 'vaporwave') ? 'vaporwave'
+        : (id === 'aurora-aero') ? 'aurora-aero'
+        : id;
 
-      // hélices
-      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x - 6, this.y + 2);
-      ctx.lineTo(x + 6, this.y + 2);
-      ctx.moveTo(x + this.width - 6, this.y + 2);
-      ctx.lineTo(x + this.width + 6, this.y + 2);
-      ctx.stroke();
+      let base = '#dfe6e9';
+      if (v === 'tecnozen') base = '#00FFFF';
+      else if (v === 'metro') base = '#4aa3ff';
+      else if (v === 'vaporwave') base = '#FF00FF';
+      else if (v === 'aurora-aero') base = '#FFD700';
+      else if (v === 'windows-xp') base = '#ECE9D8';
+      else if (v === 'windows-vista') base = 'rgba(255,255,255,0.60)';
+      else if (v === 'fruitiger') base = '#6fe7ff';
 
-      // olho/sensor
-      ctx.fillStyle = themeId === 'evil' ? '#ff3b2f' : '#2c3e50';
-      ctx.fillRect(x + 11, this.y + 6, 6, 4);
+      const dark = 'rgba(0,0,0,0.35)';
+      const eye = (v === 'evil') ? '#ff3b2f' : (v === 'vaporwave' ? '#00FFFF' : '#2c3e50');
+
+      const palette = {
+        H: base,
+        B: base,
+        E: eye,
+        C: dark,
+        P: dark
+      };
+
+      const flip = this.direction === -1;
+      _drawPixelSprite(ctx, SPRITE.idle, x, this.y, this.width, this.height, palette, flip);
+
+      // jato/propulsão (leve)
+      ctx.fillStyle = 'rgba(255,255,255,0.20)';
+      ctx.fillRect(x + 2, this.y + this.height - 4, this.width - 4, 3);
     }
 
     _collides(obj) {

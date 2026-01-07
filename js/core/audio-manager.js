@@ -17,7 +17,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.currentThemeId = 'japan';
       this.baseThemeId = 'japan';
       this.musicMode = 'normal'; // normal | boss | menu
-      this.currentVariant = 0; // 0=A, 1=B
+      this.currentVariant = 0; // 0=A, 1=B, 2=C
 
       this.muteButton = null;
       this._warnedAutoplay = false;
@@ -84,18 +84,43 @@ window.SuperBario99 = window.SuperBario99 || {};
       }
 
       // Variante A/B muda a cada troca (e faz as músicas parecerem "mais"
-      this.currentVariant = (this.currentVariant + 1) % 2;
+      this.currentVariant = (this.currentVariant + 1) % 3;
+
+      // Normaliza (aceita themeId antigo e aestheticId novo)
+      const normalizeBase = (id) => {
+        const s = String(id || 'menu');
+        if (s === 'menu') return 'menu';
+        if (s === 'japan') return 'japan';
+        if (s === 'fruitiger') return 'fruitiger-aero';
+        if (s === 'fruitiger-aero') return 'fruitiger-aero';
+        if (s === 'tecnozen') return 'tecno-zen';
+        if (s === 'tecno-zen') return 'tecno-zen';
+        if (s === 'dorfic') return 'dorfic';
+        if (s === 'metro') return 'metro-aero';
+        if (s === 'metro-aero') return 'metro-aero';
+        if (s === 'evil') return 'vaporwave';
+        if (s === 'memefusion') return 'aurora-aero';
+        if (s === 'windows-xp') return 'windows-xp';
+        if (s === 'windows-vista') return 'windows-vista';
+        if (s === 'vaporwave') return 'vaporwave';
+        if (s === 'aurora-aero') return 'aurora-aero';
+        return s;
+      };
+
+      this.baseThemeId = normalizeBase(this.baseThemeId);
 
       // BPM por bloco (efeito “temático”)
       const tempoByTheme = {
         menu: 110,
         japan: 132,
-        fruitiger: 118,
-        tecnozen: 108,
+        'fruitiger-aero': 118,
+        'tecno-zen': 108,
         dorfic: 92,
-        metro: 160,
-        evil: 140,
-        memefusion: 150
+        'metro-aero': 156,
+        vaporwave: 112,
+        'aurora-aero': 124,
+        'windows-xp': 120,
+        'windows-vista': 122
       };
 
       const base = this.baseThemeId;
@@ -228,12 +253,14 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       const base = this.baseThemeId;
       if (base === 'japan') return this._musicJapan(step, time, this.currentVariant);
-      if (base === 'fruitiger') return this._musicFruitiger(step, time, this.currentVariant);
-      if (base === 'tecnozen') return this._musicTecnoZen(step, time, this.currentVariant);
+      if (base === 'windows-xp') return this._musicWindowsXP(step, time, this.currentVariant);
+      if (base === 'windows-vista') return this._musicWindowsVista(step, time, this.currentVariant);
+      if (base === 'fruitiger-aero') return this._musicFruitigerAero(step, time, this.currentVariant);
+      if (base === 'tecno-zen') return this._musicTecnoZen(step, time, this.currentVariant);
       if (base === 'dorfic') return this._musicDorfic(step, time, this.currentVariant);
-      if (base === 'metro') return this._musicMetro(step, time, this.currentVariant);
-      if (base === 'evil') return this._musicEvil(step, time, this.currentVariant);
-      if (base === 'memefusion') return this._musicMemeFusion(step, time, this.currentVariant);
+      if (base === 'metro-aero') return this._musicMetroAero(step, time, this.currentVariant);
+      if (base === 'vaporwave') return this._musicVaporwave(step, time, this.currentVariant);
+      if (base === 'aurora-aero') return this._musicAuroraAero(step, time, this.currentVariant);
       return this._musicJapan(step, time, this.currentVariant);
     }
 
@@ -250,12 +277,14 @@ window.SuperBario99 = window.SuperBario99 || {};
       const stab = step % 4 === 0;
       const bassSeq = {
         japan: [110, 110, 146.83, 110, 98, 110, 146.83, 110],
-        fruitiger: [130.81, 164.81, 196, 164.81, 146.83, 164.81, 196, 220],
-        tecnozen: [92.5, 110, 92.5, 123.47, 92.5, 110, 92.5, 146.83],
+        'windows-xp': [130.81, 146.83, 164.81, 146.83, 123.47, 130.81, 146.83, 164.81],
+        'windows-vista': [146.83, 164.81, 196, 174.61, 164.81, 146.83, 130.81, 146.83],
+        'fruitiger-aero': [130.81, 164.81, 196, 164.81, 146.83, 164.81, 196, 220],
+        'tecno-zen': [92.5, 110, 92.5, 123.47, 92.5, 110, 92.5, 146.83],
         dorfic: [82.41, 98, 110, 98, 73.42, 82.41, 98, 82.41],
-        metro: [110, 110, 146.83, 110, 98, 110, 146.83, 110],
-        evil: [110, 103.83, 98, 87.31, 98, 103.83, 110, 123.47],
-        memefusion: [110, 130.81, 146.83, 164.81, 146.83, 130.81, 110, 98]
+        'metro-aero': [110, 110, 146.83, 110, 98, 110, 146.83, 110],
+        vaporwave: [98, 110, 123.47, 110, 146.83, 130.81, 123.47, 110],
+        'aurora-aero': [110, 123.47, 146.83, 164.81, 146.83, 123.47, 110, 98]
       };
       const seq = bassSeq[baseThemeId] || bassSeq.japan;
       const f = seq[step % 8];
@@ -272,16 +301,43 @@ window.SuperBario99 = window.SuperBario99 || {};
       ];
       const idx = (variant === 0
         ? [0, 2, 3, 2, 4, 2, 3, 1]
-        : [0, 3, 2, 1, 4, 3, 2, 1]
+        : (variant === 1
+          ? [0, 3, 2, 1, 4, 3, 2, 1]
+          : [0, 2, 4, 2, 3, 1, 3, 2]
+        )
       )[step % 8];
       const f = scale[idx];
       this._tone(f, time, 0.10, 'triangle', 0.05);
       this._tone(f / 2, time, 0.12, 'sine', 0.02);
     }
 
-    _musicFruitiger(step, time, variant) {
-      const chord = [261.63, 329.63, 392];
-      const pick = variant === 0 ? chord : [293.66, 369.99, 440];
+    _musicWindowsXP(step, time, variant) {
+      // "startup / chime" simplificado (major alegre)
+      const seqA = [261.63, 329.63, 392, 523.25, 392, 329.63, 293.66, 329.63];
+      const seqB = [293.66, 369.99, 440, 587.33, 440, 369.99, 329.63, 369.99];
+      const seqC = [329.63, 392, 493.88, 659.25, 493.88, 392, 349.23, 392];
+      const seq = (variant === 0) ? seqA : (variant === 1 ? seqB : seqC);
+      const f = seq[step % 8];
+      this._tone(f, time, 0.10, 'sine', 0.04);
+      if (step % 4 === 0) this._tone(f * 2, time + 0.02, 0.06, 'triangle', 0.02);
+    }
+
+    _musicWindowsVista(step, time, variant) {
+      // "Aero" mais suave e brilhante
+      const padA = [220, 246.94, 277.18, 329.63, 277.18, 246.94, 220, 196];
+      const padB = [246.94, 277.18, 329.63, 392, 329.63, 277.18, 246.94, 220];
+      const padC = [196, 220, 246.94, 293.66, 246.94, 220, 196, 174.61];
+      const seq = (variant === 0) ? padA : (variant === 1 ? padB : padC);
+      const f = seq[step % 8];
+      this._tone(f, time, 0.14, 'triangle', 0.03);
+      if (step % 2 === 0) this._tone(f * 2, time + 0.01, 0.06, 'sine', 0.02);
+    }
+
+    _musicFruitigerAero(step, time, variant) {
+      const chordA = [261.63, 329.63, 392];
+      const chordB = [293.66, 369.99, 440];
+      const chordC = [329.63, 392, 493.88];
+      const pick = (variant === 0) ? chordA : (variant === 1 ? chordB : chordC);
       const f = pick[step % pick.length] * (step % 4 === 0 ? 2 : 1);
       this._tone(f, time, 0.12, 'sine', 0.04);
       this._tone(f * 2, time + 0.02, 0.06, 'triangle', 0.02);
@@ -290,7 +346,10 @@ window.SuperBario99 = window.SuperBario99 || {};
     _musicTecnoZen(step, time, variant) {
       const seq = variant === 0
         ? [220, 0, 246.94, 0, 277.18, 0, 246.94, 0]
-        : [246.94, 0, 277.18, 0, 293.66, 0, 277.18, 0];
+        : (variant === 1
+          ? [246.94, 0, 277.18, 0, 293.66, 0, 277.18, 0]
+          : [277.18, 0, 293.66, 0, 329.63, 0, 293.66, 0]
+        );
       const f = seq[step % seq.length];
       if (!f) return;
       this._tone(f, time, 0.18, 'sine', 0.035);
@@ -300,40 +359,52 @@ window.SuperBario99 = window.SuperBario99 || {};
     _musicDorfic(step, time, variant) {
       const seq = variant === 0
         ? [196, 220, 246.94, 220, 174.61, 196, 220, 196]
-        : [174.61, 196, 220, 246.94, 220, 196, 174.61, 196];
+        : (variant === 1
+          ? [174.61, 196, 220, 246.94, 220, 196, 174.61, 196]
+          : [220, 246.94, 293.66, 246.94, 196, 220, 246.94, 220]
+        );
       const f = seq[step % seq.length];
       this._tone(f, time, 0.20, 'sawtooth', 0.03);
       this._tone(f / 2, time, 0.22, 'square', 0.02);
     }
 
-    _musicMetro(step, time, variant) {
+    _musicMetroAero(step, time, variant) {
       // DnB feel: kick/hat simulado com tons
       const kick = (step % 4 === 0) ? 65.41 : 0;
       if (kick) this._tone(kick, time, 0.06, 'sine', 0.06);
       if (step % 2 === 1) this._tone(880, time, 0.02, 'square', 0.015);
       const bass = (variant === 0
         ? [110, 110, 146.83, 110, 98, 110, 146.83, 110]
-        : [98, 110, 123.47, 110, 146.83, 110, 123.47, 110]
+        : (variant === 1
+          ? [98, 110, 123.47, 110, 146.83, 110, 123.47, 110]
+          : [110, 123.47, 146.83, 164.81, 146.83, 123.47, 110, 98]
+        )
       )[step % 8];
       this._tone(bass, time, 0.10, 'triangle', 0.03);
     }
 
-    _musicEvil(step, time, variant) {
-      const seq = variant === 0
-        ? [220, 207.65, 196, 174.61, 196, 207.65, 220, 246.94]
-        : [246.94, 220, 207.65, 196, 174.61, 196, 207.65, 220];
-      const f = seq[step % seq.length];
-      this._tone(f, time, 0.14, 'sawtooth', 0.045);
-      this._tone(f * 2, time + 0.03, 0.06, 'square', 0.02);
+    _musicVaporwave(step, time, variant) {
+      // neon lento + pulsos (sine + square suave)
+      const seqA = [110, 0, 123.47, 0, 146.83, 0, 123.47, 0];
+      const seqB = [98, 0, 110, 0, 130.81, 0, 110, 0];
+      const seqC = [130.81, 0, 146.83, 0, 164.81, 0, 146.83, 0];
+      const seq = (variant === 0) ? seqA : (variant === 1 ? seqB : seqC);
+      const f = seq[step % 8];
+      if (!f) return;
+      this._tone(f, time, 0.20, 'sine', 0.03);
+      if (step % 4 === 0) this._tone(f * 2, time + 0.01, 0.06, 'square', 0.012);
     }
 
-    _musicMemeFusion(step, time, variant) {
-      // mistura rápida de motivos
-      const pick = (step + (variant ? 3 : 0)) % 14;
-      if (pick < 4) return this._musicJapan(step, time, variant);
-      if (pick < 7) return this._musicFruitiger(step, time, variant);
-      if (pick < 10) return this._musicMetro(step, time, variant);
-      return this._musicTecnoZen(step, time, variant);
+    _musicAuroraAero(step, time, variant) {
+      // arpejo espacial brilhante
+      const seqA = [261.63, 329.63, 392, 493.88, 392, 329.63, 293.66, 329.63];
+      const seqB = [293.66, 392, 493.88, 587.33, 493.88, 392, 329.63, 392];
+      const seqC = [220, 293.66, 369.99, 440, 369.99, 293.66, 246.94, 293.66];
+      const seq = (variant === 0) ? seqA : (variant === 1 ? seqB : seqC);
+      const f = seq[step % 8];
+      this._tone(f, time, 0.12, 'triangle', 0.03);
+      this._tone(f * 2, time + 0.02, 0.06, 'sine', 0.02);
+      if (step % 8 === 0) this._tone(55, time, 0.18, 'sine', 0.02);
     }
 
     _tone(freq, startTime, duration, type, gainValue) {

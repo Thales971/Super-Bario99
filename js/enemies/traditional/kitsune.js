@@ -2,6 +2,92 @@
 window.SuperBario99 = window.SuperBario99 || {};
 
 (function () {
+  const SPRITE = {
+    idle: [
+      '....HHHHHH....',
+      '...HOOOOOOH...',
+      '...OWW..WWO...',
+      '...OWW..WWO...',
+      '...OOOOOOOO...',
+      '..TT000000TT..',
+      '..TTTT00TTTT..',
+      '....OOOOOO....',
+      '...OOOOOOOO...',
+      '...OOFFFFOO...',
+      '...PPOOOOPP...',
+      '...PPOOOOPP...',
+      '....PP..PP....',
+      '....PP..PP....'
+    ],
+    run1: [
+      '....HHHHHH....',
+      '...HOOOOOOH...',
+      '...OWW..WWO...',
+      '...OWW..WWO...',
+      '...OOOOOOOO...',
+      '..TT000000TT..',
+      '..TTTT00TTTT..',
+      '....OOOOOO....',
+      '...OOOOOOOO...',
+      '...OOFFFFOO...',
+      '...PPOOOOPP...',
+      '...PPOOOOPP...',
+      '...PP..PP.....',
+      '.....PP..PP...'
+    ],
+    run2: [
+      '....HHHHHH....',
+      '...HOOOOOOH...',
+      '...OWW..WWO...',
+      '...OWW..WWO...',
+      '...OOOOOOOO...',
+      '..TT000000TT..',
+      '..TTTT00TTTT..',
+      '....OOOOOO....',
+      '...OOOOOOOO...',
+      '...OOFFFFOO...',
+      '...PPOOOOPP...',
+      '...PPOOOOPP...',
+      '.....PP..PP...',
+      '...PP..PP.....'
+    ]
+  };
+
+  function _drawPixelSprite(ctx, sprite, x, y, boxW, boxH, palette, flip) {
+    const h = sprite.length;
+    const w = sprite[0] ? sprite[0].length : 0;
+    if (!w || !h) return;
+
+    const scale = Math.max(1, Math.min(Math.floor(boxW / w), Math.floor(boxH / h)));
+
+    let visibleBottom = -1;
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        if (ch !== '.' && ch !== ' ') { visibleBottom = row; break; }
+      }
+    }
+    const trimBottom = (visibleBottom >= 0) ? (h - 1 - visibleBottom) : 0;
+
+    const drawW = w * scale;
+    const drawH = h * scale;
+    const x0 = x + Math.floor((boxW - drawW) / 2);
+    const y0 = y + (boxH - drawH) + (trimBottom * scale);
+
+    for (let row = 0; row < h; row++) {
+      const line = sprite[row];
+      for (let col = 0; col < w; col++) {
+        const ch = line[col];
+        const color = palette[ch];
+        if (!color) continue;
+        const drawCol = flip ? (w - 1 - col) : col;
+        ctx.fillStyle = color;
+        ctx.fillRect(x0 + drawCol * scale, y0 + row * scale, scale, scale);
+      }
+    }
+  }
+
   class Kitsune {
     constructor(x, y) {
       this.x = x;
@@ -67,9 +153,9 @@ window.SuperBario99 = window.SuperBario99 || {};
     checkPlayerCollision(player) {
       if (!this.alive) return false;
       if (this._collides(player)) {
-        if (player.velocityY > 0 && player.y + player.height < this.y + this.height * 0.55) {
+        if (player.vy > 0 && player.y + player.height < this.y + this.height * 0.55) {
           this.die();
-          player.velocityY = -10;
+          player.vy = -10;
           player.score += 150;
           return false;
         }
@@ -91,24 +177,59 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!this.alive) return;
       const x = this.x - cameraX;
 
+      const id = (themeId || 'japan');
+      const v = (id === 'fruitiger-aero') ? 'fruitiger'
+        : (id === 'metro-aero') ? 'metro'
+        : (id === 'tecno-zen') ? 'tecnozen'
+        : (id === 'windows-xp') ? 'windows-xp'
+        : (id === 'windows-vista') ? 'windows-vista'
+        : (id === 'vaporwave') ? 'vaporwave'
+        : (id === 'aurora-aero') ? 'aurora-aero'
+        : id;
+
       // blink visual
       if (this.blinkTimer > 0) {
         ctx.fillStyle = 'rgba(255,182,213,0.22)';
         ctx.fillRect(x - 6, this.y - 6, this.width + 12, this.height + 12);
       }
 
-      // corpo
-      ctx.fillStyle = themeId === 'evil' ? '#ff3b2f' : '#f39c12';
-      ctx.fillRect(x, this.y, this.width, this.height);
+      // corpo humanoide (espírito raposa)
+      let body = '#f39c12';
+      if (v === 'evil') body = '#ff3b2f';
+      else if (v === 'vaporwave') body = '#FF00FF';
+      else if (v === 'tecnozen') body = '#00FFFF';
+      else if (v === 'aurora-aero') body = '#FFD700';
+      else if (v === 'windows-xp') body = '#00CC00';
+      else if (v === 'windows-vista') body = '#00BFFF';
+      else if (v === 'metro') body = '#4aa3ff';
+      else if (v === 'fruitiger') body = '#6fe7ff';
 
-      // cauda
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.fillRect(x - 8, this.y + 16, 10, 10);
+      const tail = 'rgba(255,255,255,0.75)';
+      const eye = '#2c3e50';
+      const accent = 'rgba(0,0,0,0.18)';
 
-      // olhos
-      ctx.fillStyle = '#2c3e50';
-      ctx.fillRect(x + 8, this.y + 10, 4, 4);
-      ctx.fillRect(x + 18, this.y + 10, 4, 4);
+      const palette = {
+        H: tail,
+        O: body,
+        W: 'rgba(245,246,250,0.85)',
+        F: accent,
+        0: body,
+        T: tail,
+        P: '#1b1b1b'
+      };
+
+      const flip = this.vx < 0;
+      const frame = (Math.abs(this.vx) > 0.25)
+        ? ((Math.floor((Date.now() / 110) % 2) === 0) ? SPRITE.run1 : SPRITE.run2)
+        : SPRITE.idle;
+
+      _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
+
+      // pupilas (por cima)
+      ctx.fillStyle = eye;
+      const px = x + (flip ? 8 : 18);
+      ctx.fillRect(px, this.y + 12, 2, 2);
+      ctx.fillRect(px + (flip ? 6 : -6), this.y + 12, 2, 2);
     }
 
     _collides(obj) {
