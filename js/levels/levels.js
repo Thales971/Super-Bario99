@@ -286,8 +286,12 @@ window.SuperBario99 = window.SuperBario99 || {};
     }
   }
 
+  const WORLD_GROUND_Y = 380; // antes 400 (plataformas estavam muito baixas)
+  const WORLD_GROUND_H = 50;
+  const GOAL_H = 64;
+
   function addGround(level) {
-    level.platforms.push(new Platform(0, 400, level.worldWidth, 50));
+    level.platforms.push(new Platform(0, WORLD_GROUND_Y, level.worldWidth, WORLD_GROUND_H));
   }
 
   function generateLayout(levelIndex, rng) {
@@ -313,13 +317,13 @@ window.SuperBario99 = window.SuperBario99 || {};
     const maxGap = 160 + Math.floor(levelIndex * 1.4);
 
     let x = 180;
-    let lastY = 340;
+    let lastY = 320;
     for (let i = 0; i < segmentCount; i++) {
       const w = 80 + Math.floor(rng() * 120);
       const h = 20;
       // Altura mais suave (evita plataformas "longe" verticalmente)
       const delta = Math.floor((rng() - 0.5) * 120);
-      lastY = Math.max(200, Math.min(360, lastY + delta + (diff.nightMode ? 10 : 0)));
+      lastY = Math.max(180, Math.min(340, lastY + delta + (diff.nightMode ? 10 : 0)));
       const y = lastY;
 
       level.platforms.push(new Platform(x, y, w, h));
@@ -337,7 +341,7 @@ window.SuperBario99 = window.SuperBario99 || {};
     }
 
     // Meta no fim
-    level.goals.push(new Goal(worldWidth - 120, 336));
+    level.goals.push(new Goal(worldWidth - 120, WORLD_GROUND_Y - GOAL_H));
 
     return level;
   }

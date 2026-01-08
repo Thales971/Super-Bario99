@@ -96,6 +96,15 @@ window.SuperBario99 = window.SuperBario99 || {};
       this._checkSave();
     }
 
+    _releaseTouchKeys() {
+      // Chaves usadas por controles touch/swipe
+      this.keys['ArrowLeft'] = false;
+      this.keys['ArrowRight'] = false;
+      this.keys[' '] = false;
+      this.keys['x'] = false;
+      this.keys['X'] = false;
+    }
+
     _isTouchDevice() {
       return (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
     }
@@ -121,6 +130,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
     _clearInput() {
       this.keys = Object.create(null);
+      this._gamepadState = { left: false, right: false, jump: false, attack: false };
     }
 
     _checkSave() {
@@ -159,6 +169,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       });
 
       window.addEventListener('blur', () => this._clearInput());
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) this._clearInput();
+      });
       window.addEventListener('resize', () => this._applyTouchVisibility());
 
       this.continueBtn.addEventListener('click', () => this.loadGame());
@@ -210,6 +223,8 @@ window.SuperBario99 = window.SuperBario99 || {};
         el.addEventListener('pointerup', up);
         el.addEventListener('pointercancel', up);
         el.addEventListener('pointerleave', up);
+        el.addEventListener('pointerout', up);
+        el.addEventListener('lostpointercapture', up);
       };
 
       bindHold(this.touchLeftBtn, 'ArrowLeft');
@@ -412,6 +427,7 @@ window.SuperBario99 = window.SuperBario99 || {};
     goToMenu() {
       this.running = false;
       this.audio.stopMusic();
+      this._releaseTouchKeys();
 
       this._isFreeMode = false;
       this._freeConfig = null;
@@ -700,6 +716,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (this._isFreeMode) {
         this.running = false;
         this.audio.stopMusic();
+        this._releaseTouchKeys();
         this.audio.playSfx(victory ? 'powerup' : 'gameOver');
         this.endTitle.textContent = victory ? 'VITÓRIA!' : 'FIM (MODO LIVRE)';
         this.endScore.textContent = `Pontuação: ${this.player ? this.player.score : 0}`;
@@ -724,6 +741,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       this.running = false;
       this.audio.stopMusic();
+      this._releaseTouchKeys();
       this.audio.playSfx(victory ? 'powerup' : 'gameOver');
 
       if (this.player && this.player.score > this.bestScore) {
