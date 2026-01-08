@@ -251,10 +251,13 @@ window.SuperBario99 = window.SuperBario99 || {};
     }
 
     _populate() {
-      // Fases 1..50
+      // Fases 1..N (default 99 no v2)
       if (this.stageSel) {
         this.stageSel.innerHTML = '';
-        for (let i = 0; i < 50; i++) {
+        const totalStages = (SuperBario99.levelsV2 && SuperBario99.levelsV2.createLevels100)
+          ? 100
+          : ((SuperBario99.levelsV2 && SuperBario99.levelsV2.createLevels99) ? 99 : 50);
+        for (let i = 0; i < totalStages; i++) {
           const opt = document.createElement('option');
           opt.value = String(i);
           opt.textContent = `Fase ${i + 1}`;

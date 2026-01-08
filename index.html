@@ -12,6 +12,10 @@
         <div id="score-display">Pontos: 0</div>
         <div id="level-display">Fase: 1</div>
         <div id="best-display">Recorde: 0</div>
+        <div id="powerup-display" aria-label="Power-up ativo" style="display:none;">
+            <span class="pu-icon" aria-hidden="true"></span>
+            <span class="pu-text"></span>
+        </div>
         <button id="mute-btn" aria-pressed="false" title="Silenciar">🔊</button>
 
         <!-- Controles touch (aparece automaticamente em dispositivos móveis) -->
@@ -30,7 +34,7 @@
     <div id="menu">
         <div class="menu-card" role="dialog" aria-label="Menu inicial">
             <h1>SUPER-BARIO99</h1>
-            <div class="menu-sub">50 fases • boss a cada 5 • 10 vidas</div>
+            <div class="menu-sub">100 fases • 11 bosses épicos • 10 vidas</div>
             <div class="menu-actions" aria-label="Ações do menu">
                 <button id="continue-btn" style="display: none;">CONTINUAR</button>
                 <button id="start-btn">NOVO JOGO</button>
@@ -45,6 +49,7 @@
         <p>Setas direcionais para mover</p>
         <p>Espaço para pular</p>
         <p>X para atacar</p>
+        <p>Dica: pule e pouse em cima do bloco "?" para liberar power-up</p>
         <p>Meta: Colete moedas e chegue na bandeira!</p>
         <button id="back-btn">VOLTAR</button>
     </div>
@@ -91,7 +96,7 @@
                 <label>
                     Modo de seleção
                     <select id="fm-stage-mode" aria-label="Modo de seleção de fase">
-                        <option value="classic">Modo Clássico (1-50)</option>
+                        <option value="classic">Modo Clássico (1-100)</option>
                         <option value="random10">Modo Aleatório (10 fases)</option>
                         <option value="creator">Modo Criador (sequência)</option>
                         <option value="challenge">Modo Desafio (por dificuldade)</option>
@@ -205,14 +210,24 @@
         <script src="js/ai/difficulty-system.js"></script>
         <script src="js/ai/pathfinding.js"></script>
         <script src="js/levels/levels.js"></script>
+        <script src="js/powerups/gear-renderer.js"></script>
+        <script src="js/powerups/powerup-system.js"></script>
+        <script src="js/powerups/question-blocks.js"></script>
+        <script src="js/powerups/projectiles.js"></script>
+        <script src="js/environment/weather-system.js"></script>
+        <script src="js/environment/scenery-builder.js"></script>
+        <script src="js/environment/dynamic-backgrounds.js"></script>
         <script src="js/enemies/traditional/ninja.js"></script>
         <script src="js/enemies/traditional/yokai.js"></script>
         <script src="js/enemies/traditional/samurai.js"></script>
         <script src="js/enemies/traditional/tanuki.js"></script>
         <script src="js/enemies/traditional/kitsune.js"></script>
         <script src="js/enemies/traditional/drone.js"></script>
+        <script src="js/enemies/bosses/boss-registry.js"></script>
         <script src="js/enemies/bosses/theme-boss.js"></script>
         <script src="js/core/player.js"></script>
+        <script src="js/npcs/lore-generator.js"></script>
+        <script src="js/npcs/human-npc.js"></script>
         <script src="js/modes/free-mode.js"></script>
         <script src="js/core/game.js"></script>
         <script>

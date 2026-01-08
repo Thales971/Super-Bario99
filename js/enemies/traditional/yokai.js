@@ -234,6 +234,44 @@ window.SuperBario99 = window.SuperBario99 || {};
       ctx.fillRect(x - 6, this.y - 4, this.width + 12, this.height + 8);
 
       _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
+
+      // detalhe extra: chifres + faíscas espectrais (novo visual)
+      try {
+        const cx = x + this.width / 2;
+        const top = this.y + 6;
+
+        // chifres
+        ctx.save();
+        ctx.globalAlpha = 0.65;
+        ctx.fillStyle = 'rgba(245,246,250,0.25)';
+        ctx.beginPath();
+        ctx.moveTo(cx - 10, top + 6);
+        ctx.lineTo(cx - 16, top - 6);
+        ctx.lineTo(cx - 6, top + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(cx + 10, top + 6);
+        ctx.lineTo(cx + 16, top - 6);
+        ctx.lineTo(cx + 6, top + 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // faíscas (amarradas ao tempo para parecer “vivo”)
+        const t = (performance.now() * 0.004);
+        let spark = 'rgba(255,255,255,0.14)';
+        if (v === 'evil') spark = 'rgba(255,59,47,0.18)';
+        else if (v === 'tecnozen') spark = 'rgba(0,255,255,0.16)';
+        else if (v === 'vaporwave') spark = 'rgba(255,0,255,0.14)';
+        else if (v === 'aurora-aero') spark = 'rgba(127,255,0,0.12)';
+        ctx.fillStyle = spark;
+        for (let i = 0; i < 4; i++) {
+          const ox = Math.sin(t + i * 1.7) * (10 + i * 2);
+          const oy = Math.cos(t * 0.9 + i * 2.1) * (8 + i);
+          ctx.fillRect(cx + ox, this.y + 18 + oy, 2, 2);
+        }
+        ctx.restore();
+      } catch (_) {}
     }
 
     _collides(obj) {

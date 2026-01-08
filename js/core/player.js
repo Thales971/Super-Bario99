@@ -173,6 +173,10 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       this.invincibleTime = 0;
 
+      // Efeitos temporários (usados por bosses)
+      this._sb99SlowUntil = 0;
+      this._sb99StunUntil = 0;
+
       // animação
       this.walkTime = 0;
       this._isMoving = false;
@@ -186,18 +190,24 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.stretchTimer = 0;
     }
 
-    update(gravity, level, keys, canvasHeight = 450) {
+    update(gravity, level, keys, canvasHeight = 450, audio = null, now = 0, mod = null) {
       if (this.invincibleTime > 0) this.invincibleTime--;
       if (this.attackCooldown > 0) this.attackCooldown--;
       if (this.attackTime > 0) this.attackTime--;
       if (this.squashTimer > 0) this.squashTimer--;
       if (this.stretchTimer > 0) this.stretchTimer--;
 
+      const baseScale = (mod && typeof mod.speedScale === 'number') ? mod.speedScale : 1;
+      const tNow = (typeof now === 'number' && isFinite(now)) ? now : performance.now();
+      const statusScale = (this._sb99SlowUntil && tNow < this._sb99SlowUntil) ? 0.62 : 1;
+      const speedScale = baseScale * statusScale;
+
       this._isMoving = false;
 
       // Entrada
-      const left = !!keys['ArrowLeft'];
-      const right = !!keys['ArrowRight'];
+      const stunned = (this._sb99StunUntil && tNow < this._sb99StunUntil);
+      const left = stunned ? false : !!keys['ArrowLeft'];
+      const right = stunned ? false : !!keys['ArrowRight'];
 
       // Movimento horizontal (aceleração)
       const accel = this.onGround ? this.accelGround : this.accelAir;
@@ -215,9 +225,10 @@ window.SuperBario99 = window.SuperBario99 || {};
         if (Math.abs(this.vx) < 0.03) this.vx = 0;
       }
 
-      // clamp velocidade
-      if (this.vx > this.maxSpeed) this.vx = this.maxSpeed;
-      if (this.vx < -this.maxSpeed) this.vx = -this.maxSpeed;
+      // clamp velocidade (clima pode reduzir movimentação)
+      const maxSpeed = this.maxSpeed * Math.max(0.55, Math.min(1.2, speedScale));
+      if (this.vx > maxSpeed) this.vx = maxSpeed;
+      if (this.vx < -maxSpeed) this.vx = -maxSpeed;
 
       if (this._isMoving && this.onGround) this.walkTime++;
       else this.walkTime = 0;
@@ -238,25 +249,60 @@ window.SuperBario99 = window.SuperBario99 || {};
       }
 
       // eixo Y
+      const prevY = this.y;
+      const prevTop = prevY;
+      const prevBottom = prevY + this.height;
       this.vy += gravity;
       this.y += this.vy;
 
       const wasOnGround = this.onGround;
       this.onGround = false;
-      for (const p of level.platforms) {
-        if (!this._collides(p)) continue;
-        if (this.vy > 0) {
-          this.y = p.y - this.height;
+
+      // Resolve colisão vertical escolhendo o melhor candidato.
+      // Isso evita casos em que o player encosta em 2 retângulos empilhados
+      // (ex.: plataforma + QuestionBlock em cima) e “pousa” no de baixo.
+      // eps maior para não perder landing em blocos 32x32.
+      const eps = 8;
+      if (this.vy >= 0) {
+        // caindo: escolhe a plataforma mais alta (menor y) que foi atingida por cima
+        let best = null;
+        for (const p of level.platforms) {
+          if (!this._collides(p)) continue;
+          // landing: precisa ter cruzado o topo da plataforma vindo de cima
+          const crossedTop = (prevBottom <= p.y + eps) && ((this.y + this.height) >= p.y - 1);
+          if (!crossedTop) continue;
+          if (!best || p.y < best.y) best = p;
+        }
+        if (best) {
+          this.y = best.y - this.height;
           this.vy = 0;
           this.onGround = true;
-        } else if (this.vy < 0) {
-          this.y = p.y + p.height;
+          if (typeof best.onHitFromAbove === 'function') {
+            try { best.onHitFromAbove(this, audio, level, now || performance.now()); } catch (_) {}
+          }
+        }
+      } else if (this.vy < 0) {
+        // subindo: escolhe a plataforma mais baixa (maior y+height) atingida por baixo
+        let best = null;
+        for (const p of level.platforms) {
+          if (!this._collides(p)) continue;
+          // head-bump: precisa ter cruzado a base da plataforma vindo de baixo
+          const crossedBottom = (prevTop >= (p.y + p.height) - eps) && (this.y <= (p.y + p.height) + 1);
+          if (!crossedBottom) continue;
+          if (!best || (p.y + p.height) > (best.y + best.height)) best = p;
+        }
+        if (best) {
+          this.y = best.y + best.height;
           this.vy = 0;
+          if (typeof best.onHitFromBelow === 'function') {
+            try { best.onHitFromBelow(this, audio, level, now || performance.now()); } catch (_) {}
+          }
         }
       }
 
-      // chão do canvas (fallback)
-      const floorY = canvasHeight - this.height;
+      // chão do canvas (fallback) — margem para evitar “abaixo da terra”
+      const floorMargin = 20;
+      const floorY = canvasHeight - this.height - floorMargin;
       if (this.y > floorY) {
         this.y = floorY;
         this.vy = 0;
@@ -307,9 +353,13 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.invincibleTime = 90;
     }
 
-    draw(ctx, cameraX, themeId) {
+    draw(ctx, cameraX, themeId, powerups = null) {
       const blink = this.invincibleTime > 0 && (Math.floor(this.invincibleTime / 6) % 2 === 0);
       if (blink) return;
+
+      const now = performance.now();
+      const invisible = !!(powerups && powerups.isPlayerInvisible && powerups.isPlayerInvisible(now));
+      const electric = !!(powerups && powerups.isActive && powerups.isActive('electric', now));
 
       const x = this.x - cameraX;
       const y = this.y;
@@ -321,9 +371,21 @@ window.SuperBario99 = window.SuperBario99 || {};
       const sy = 1 - squash * 0.10 + stretch * 0.08;
 
       ctx.save();
+      if (invisible) ctx.globalAlpha = 0.28;
       ctx.translate(x + this.width / 2, y + this.height / 2);
       ctx.scale(sx, sy);
       ctx.translate(-(x + this.width / 2), -(y + this.height / 2));
+
+      // Aura elétrica (simples, prioriza leitura)
+      if (electric) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,215,0,0.35)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x + this.width / 2, y + this.height / 2, 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Seleção de frame
       let frameName = 'idle';

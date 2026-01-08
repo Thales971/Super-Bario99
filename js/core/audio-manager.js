@@ -24,6 +24,17 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       // fallback (se você colocar mp3 reais depois)
       this.htmlMusic = null;
+
+      // Ambiência (clima): ruído filtrado em loop
+      this._desiredAmbience = { type: 'none', intensity: 0 };
+      this._ambienceType = 'none';
+      this._ambienceSource = null;
+      this._ambienceGain = null;
+      this._ambienceFilter = null;
+      this._noiseBuffer = null;
+
+      // pause/resume por eventos de visibilidade (mobile)
+      this._systemPaused = false;
     }
 
     attachUI({ muteButton } = {}) {
@@ -41,6 +52,9 @@ window.SuperBario99 = window.SuperBario99 || {};
           this.masterGain.connect(this.audioContext.destination);
         }
       }
+
+      // aplica ambiência pendente quando o áudio ficar disponível
+      try { this._applyDesiredAmbience(); } catch (_) {}
 
       // fallback opcional
       try {
@@ -66,6 +80,138 @@ window.SuperBario99 = window.SuperBario99 || {};
           }
         }
       }
+
+      // aplica ambiência pendente após liberar áudio
+      try { this._applyDesiredAmbience(); } catch (_) {}
+    }
+
+    pauseAll() {
+      this._systemPaused = true;
+
+      // WebAudio
+      try {
+        if (this.audioContext && this.audioContext.state === 'running') {
+          this.audioContext.suspend();
+        }
+      } catch (_) {}
+
+      // HTMLAudio fallback
+      try {
+        if (this.htmlMusic && !this.htmlMusic.paused) {
+          this.htmlMusic.pause();
+        }
+      } catch (_) {}
+    }
+
+    async resumeAll() {
+      this._systemPaused = false;
+      if (this.isMuted) return;
+
+      try { await this.resume(); } catch (_) {}
+
+      // retoma fallback se a música estiver habilitada
+      try {
+        if (this.musicEnabled && this.htmlMusic && this.htmlMusic.paused) {
+          await this.htmlMusic.play();
+        }
+      } catch (_) {}
+    }
+
+    setAmbience(type, intensity = 0, aestheticId = '') {
+      this._desiredAmbience = { type: String(type || 'none'), intensity: Number(intensity) || 0, aestheticId: String(aestheticId || '') };
+      this._applyDesiredAmbience();
+    }
+
+    _applyDesiredAmbience() {
+      if (!this.audioContext || !this.masterGain) return;
+      if (this.isMuted) {
+        this._stopAmbience();
+        return;
+      }
+
+      const type = this._desiredAmbience?.type || 'none';
+      const intensity = Math.max(0, Math.min(1, this._desiredAmbience?.intensity || 0));
+
+      if (type === this._ambienceType && this._ambienceGain) {
+        this._ambienceGain.gain.value = this._ambienceGain.gain.value * 0 + (0.015 + intensity * 0.05);
+        return;
+      }
+
+      this._stopAmbience();
+      if (type === 'none') {
+        this._ambienceType = 'none';
+        return;
+      }
+
+      this._ensureNoiseBuffer();
+
+      const src = this.audioContext.createBufferSource();
+      src.buffer = this._noiseBuffer;
+      src.loop = true;
+
+      const filter = this.audioContext.createBiquadFilter();
+      const gain = this.audioContext.createGain();
+
+      // volumes baixos (ambiente, não música)
+      gain.gain.value = 0.015 + intensity * 0.05;
+
+      // perfis simples por clima
+      if (type === 'rain') {
+        filter.type = 'bandpass';
+        filter.frequency.value = 900;
+        filter.Q.value = 0.7;
+      } else if (type === 'snow') {
+        filter.type = 'lowpass';
+        filter.frequency.value = 520;
+        filter.Q.value = 0.6;
+        gain.gain.value *= 0.85;
+      } else if (type === 'sand') {
+        filter.type = 'bandpass';
+        filter.frequency.value = 420;
+        filter.Q.value = 0.9;
+      } else if (type === 'storm') {
+        filter.type = 'lowpass';
+        filter.frequency.value = 380;
+        filter.Q.value = 0.8;
+        gain.gain.value *= 1.05;
+      } else {
+        filter.type = 'lowpass';
+        filter.frequency.value = 650;
+        filter.Q.value = 0.7;
+      }
+
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+
+      const now = this.audioContext.currentTime;
+      try { src.start(now); } catch (_) {}
+
+      this._ambienceType = type;
+      this._ambienceSource = src;
+      this._ambienceFilter = filter;
+      this._ambienceGain = gain;
+    }
+
+    _stopAmbience() {
+      try { this._ambienceSource?.stop?.(); } catch (_) {}
+      try { this._ambienceSource?.disconnect?.(); } catch (_) {}
+      try { this._ambienceFilter?.disconnect?.(); } catch (_) {}
+      try { this._ambienceGain?.disconnect?.(); } catch (_) {}
+      this._ambienceSource = null;
+      this._ambienceFilter = null;
+      this._ambienceGain = null;
+      this._ambienceType = 'none';
+    }
+
+    _ensureNoiseBuffer() {
+      if (this._noiseBuffer || !this.audioContext) return;
+      const sr = this.audioContext.sampleRate;
+      const len = Math.floor(sr * 1.0);
+      const buf = this.audioContext.createBuffer(1, len, sr);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * 0.65;
+      this._noiseBuffer = buf;
     }
 
     setTheme(themeId) {
@@ -90,9 +236,16 @@ window.SuperBario99 = window.SuperBario99 || {};
       const normalizeBase = (id) => {
         const s = String(id || 'menu');
         if (s === 'menu') return 'menu';
+        if (s === 'japan-retro') return 'japan-retro';
         if (s === 'japan') return 'japan';
         if (s === 'fruitiger') return 'fruitiger-aero';
         if (s === 'fruitiger-aero') return 'fruitiger-aero';
+        if (s === 'fruitiger-ocean') return 'fruitiger-ocean';
+        if (s === 'fruitiger-sunset') return 'fruitiger-sunset';
+        if (s === 'fruitiger-neon') return 'fruitiger-neon';
+        if (s === 'fruitiger-forest') return 'fruitiger-forest';
+        if (s === 'fruitiger-galaxy') return 'fruitiger-galaxy';
+        if (s === 'caos-final') return 'caos-final';
         if (s === 'tecnozen') return 'tecno-zen';
         if (s === 'tecno-zen') return 'tecno-zen';
         if (s === 'dorfic') return 'dorfic';
@@ -112,8 +265,15 @@ window.SuperBario99 = window.SuperBario99 || {};
       // BPM por bloco (efeito “temático”)
       const tempoByTheme = {
         menu: 110,
+        'japan-retro': 128,
         japan: 132,
         'fruitiger-aero': 118,
+        'fruitiger-ocean': 112,
+        'fruitiger-sunset': 116,
+        'fruitiger-neon': 144,
+        'fruitiger-forest': 108,
+        'fruitiger-galaxy': 124,
+        'caos-final': 150,
         'tecno-zen': 108,
         dorfic: 92,
         'metro-aero': 156,
@@ -197,10 +357,110 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (name === 'jump') return this._sfxBoingBell(t);
       if (name === 'coin') return this._sfxMonCoin(t);
       if (name === 'powerup') return this._sfxKawaiiNya(t);
+      if (name === 'ding') return this._sfxDing(t);
+      if (name === 'oneup') return this._sfxOneUp(t);
+
+      // Power-ups (engrenagens)
+      if (name === 'fire') return this._sfxFirePower(t);
+      if (name === 'ice') return this._sfxIcePower(t);
+      if (name === 'ninja') return this._sfxNinjaPower(t);
+      if (name === 'electric') return this._sfxElectricPower(t);
+      if (name === 'time') return this._sfxTimePower(t);
+      if (name === 'cosmic') return this._sfxCosmicPower(t);
+
+      // Ações/impactos
+      if (name === 'ninjaUse') return this._sfxNinjaUse(t);
+      if (name === 'fireShot') return this._sfxFireShot(t);
+      if (name === 'iceFreeze') return this._sfxIceFreeze(t);
+      if (name === 'electricZap') return this._sfxElectricZap(t);
       if (name === 'enemyDie') return this._sfxNinjaShh(t);
+      if (name === 'hurt') return this._sfxHurt(t);
       if (name === 'slash') return this._sfxSlash(t);
       if (name === 'bossHit') return this._sfxBossHit(t);
       if (name === 'gameOver') return this._sfxTempleBellSad(t);
+      if (name === 'thunder') return this._sfxThunder(t);
+    }
+
+    _sfxThunder(t) {
+      // Rumble grave + "crack" curto (sem estourar volume)
+      this._tone(55, t, 0.22, 'sine', 0.08);
+      this._tone(44, t + 0.06, 0.30, 'triangle', 0.06);
+      this._tone(33, t + 0.12, 0.40, 'sine', 0.05);
+      this._tone(880, t + 0.02, 0.05, 'sawtooth', 0.015);
+    }
+
+    _sfxHurt(t) {
+      // curto, descendente (feedback de dano)
+      this._tone(440, t, 0.05, 'triangle', 0.06);
+      this._tone(330, t + 0.05, 0.07, 'triangle', 0.05);
+      this._tone(220, t + 0.12, 0.08, 'sine', 0.04);
+    }
+
+    _sfxDing(t) {
+      this._tone(988, t, 0.05, 'triangle', 0.07);
+      this._tone(1318.5, t + 0.02, 0.06, 'triangle', 0.05);
+    }
+
+    _sfxOneUp(t) {
+      this._tone(523.25, t, 0.07, 'square', 0.06);
+      this._tone(659.25, t + 0.08, 0.07, 'square', 0.06);
+      this._tone(783.99, t + 0.16, 0.09, 'square', 0.06);
+    }
+
+    _sfxFirePower(t) {
+      this._tone(220, t, 0.06, 'sawtooth', 0.06);
+      this._tone(440, t + 0.03, 0.08, 'triangle', 0.05);
+      this._tone(880, t + 0.07, 0.06, 'sine', 0.04);
+    }
+
+    _sfxIcePower(t) {
+      this._tone(784, t, 0.05, 'sine', 0.05);
+      this._tone(1174.66, t + 0.03, 0.07, 'sine', 0.04);
+      this._tone(1568, t + 0.06, 0.05, 'triangle', 0.03);
+    }
+
+    _sfxNinjaPower(t) {
+      this._tone(196, t, 0.06, 'sawtooth', 0.05);
+      this._tone(392, t + 0.02, 0.08, 'triangle', 0.05);
+    }
+
+    _sfxElectricPower(t) {
+      this._tone(880, t, 0.03, 'square', 0.05);
+      this._tone(1320, t + 0.02, 0.03, 'square', 0.05);
+      this._tone(1760, t + 0.04, 0.03, 'square', 0.05);
+    }
+
+    _sfxTimePower(t) {
+      this._tone(330, t, 0.08, 'triangle', 0.05);
+      this._tone(262, t + 0.06, 0.10, 'triangle', 0.04);
+      this._tone(196, t + 0.12, 0.12, 'sine', 0.03);
+    }
+
+    _sfxCosmicPower(t) {
+      this._tone(523.25, t, 0.05, 'sine', 0.05);
+      this._tone(659.25, t + 0.03, 0.05, 'sine', 0.05);
+      this._tone(783.99, t + 0.06, 0.05, 'sine', 0.05);
+      this._tone(1046.5, t + 0.09, 0.08, 'triangle', 0.05);
+    }
+
+    _sfxNinjaUse(t) {
+      this._tone(392, t, 0.03, 'triangle', 0.04);
+      this._tone(196, t + 0.02, 0.06, 'sawtooth', 0.04);
+    }
+
+    _sfxFireShot(t) {
+      this._tone(880, t, 0.03, 'sawtooth', 0.04);
+      this._tone(660, t + 0.01, 0.05, 'triangle', 0.03);
+    }
+
+    _sfxIceFreeze(t) {
+      this._tone(1174.66, t, 0.03, 'sine', 0.04);
+      this._tone(1568, t + 0.02, 0.06, 'triangle', 0.03);
+    }
+
+    _sfxElectricZap(t) {
+      this._tone(1760, t, 0.02, 'square', 0.05);
+      this._tone(1320, t + 0.01, 0.03, 'square', 0.05);
     }
 
     _sfxBoingBell(t) {

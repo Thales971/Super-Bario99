@@ -249,6 +249,31 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
 
+      // detalhe extra: bandeira/insígnia nas costas (novo visual)
+      try {
+        let badge = sash;
+        if (v === 'tecnozen') badge = '#23d5ff';
+        else if (v === 'metro') badge = '#4aa3ff';
+        else if (v === 'evil') badge = '#ff3b2f';
+        else if (v === 'aurora-aero') badge = '#FFD700';
+        else if (v === 'windows-xp') badge = '#0055E5';
+        else if (v === 'windows-vista') badge = '#0078D7';
+        else if (v === 'fruitiger') badge = '#6fe7ff';
+
+        const backX = x + (this.direction === 1 ? 2 : this.width - 8);
+        const backY = this.y + 10;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(backX, backY, 6, 18);
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = badge;
+        ctx.fillRect(backX + 1, backY + 1, 4, 10);
+        ctx.globalAlpha = 0.60;
+        ctx.fillRect(backX + 1, backY + 12, 4, 5);
+        ctx.restore();
+      } catch (_) {}
+
       // Espada
       if (this.swingTime > 0) {
         ctx.strokeStyle = '#f5f6fa';
@@ -258,6 +283,20 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.moveTo(sx, this.y + 24);
         ctx.lineTo(sx + this.direction * 28, this.y + 12);
         ctx.stroke();
+
+        // rastro do golpe (curto) para leitura
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.strokeStyle = (v === 'evil') ? 'rgba(255,59,47,0.65)'
+          : (v === 'tecnozen') ? 'rgba(35,213,255,0.55)'
+            : (v === 'vaporwave') ? 'rgba(255,0,255,0.45)'
+              : 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(sx - this.direction * 4, this.y + 28);
+        ctx.lineTo(sx + this.direction * 34, this.y + 10);
+        ctx.stroke();
+        ctx.restore();
       }
     }
 

@@ -146,6 +146,31 @@ window.SuperBario99 = window.SuperBario99 || {};
       // jato/propulsão (leve)
       ctx.fillStyle = 'rgba(255,255,255,0.20)';
       ctx.fillRect(x + 2, this.y + this.height - 4, this.width - 4, 3);
+
+      // detalhe extra: rotor + luzes (novo visual)
+      try {
+        let light = 'rgba(255,255,255,0.18)';
+        if (v === 'tecnozen') light = 'rgba(0,255,255,0.22)';
+        else if (v === 'metro') light = 'rgba(74,163,255,0.22)';
+        else if (v === 'vaporwave') light = 'rgba(255,0,255,0.18)';
+        else if (v === 'aurora-aero') light = 'rgba(255,215,0,0.16)';
+
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 2;
+        const rx = x + this.width / 2;
+        const ry = this.y - 2;
+        ctx.beginPath();
+        ctx.moveTo(rx - 12, ry);
+        ctx.lineTo(rx + 12, ry);
+        ctx.stroke();
+
+        ctx.fillStyle = light;
+        ctx.fillRect(x - 1, this.y + 6, 2, 4);
+        ctx.fillRect(x + this.width - 1, this.y + 6, 2, 4);
+        ctx.restore();
+      } catch (_) {}
     }
 
     _collides(obj) {

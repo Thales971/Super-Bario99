@@ -225,6 +225,28 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
 
+      // detalhe extra: caudas brilhando (novo visual)
+      try {
+        let glow = 'rgba(255,255,255,0.10)';
+        if (v === 'evil') glow = 'rgba(255,59,47,0.12)';
+        else if (v === 'tecnozen') glow = 'rgba(0,255,255,0.12)';
+        else if (v === 'vaporwave') glow = 'rgba(255,0,255,0.10)';
+        else if (v === 'aurora-aero') glow = 'rgba(127,255,0,0.10)';
+        else if (v === 'metro') glow = 'rgba(74,163,255,0.10)';
+
+        ctx.save();
+        ctx.fillStyle = glow;
+        ctx.globalAlpha = 1;
+        const baseX = x + (flip ? this.width - 6 : 6);
+        const baseY = this.y + 20;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.arc(baseX + (flip ? 8 : -8) + i * (flip ? -4 : 4), baseY + i * 2, 6 - i, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      } catch (_) {}
+
       // pupilas (por cima)
       ctx.fillStyle = eye;
       const px = x + (flip ? 8 : 18);

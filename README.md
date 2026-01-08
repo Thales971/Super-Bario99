@@ -29,6 +29,10 @@ Um jogo de plataforma 2D desenvolvido inteiramente em **HTML5 Canvas e JavaScrip
 | **X**                  | Atacar (Golpe de Espada) |
 | **Mouse (Clique)**     | Interagir com Menu       |
 
+### Blocos "?" e Power-ups
+
+- Para liberar um power-up, **pule e pouse em cima** do bloco "?".
+
 ## 🛠️ Instalação e Execução
 
 Não é necessário instalar dependências de node_modules. O jogo roda nativamente no navegador.

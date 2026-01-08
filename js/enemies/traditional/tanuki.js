@@ -238,6 +238,21 @@ window.SuperBario99 = window.SuperBario99 || {};
         ? ((Math.floor((Date.now() / 110) % 2) === 0) ? SPRITE.run1 : SPRITE.run2)
         : SPRITE.idle;
       _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
+
+      // detalhe extra: "mochilinha"/saco (novo visual)
+      try {
+        let pack = 'rgba(0,0,0,0.22)';
+        if (v === 'fruitiger') pack = 'rgba(111,231,255,0.22)';
+        else if (v === 'metro') pack = 'rgba(74,163,255,0.20)';
+        else if (v === 'evil') pack = 'rgba(255,59,47,0.18)';
+        else if (v === 'vaporwave') pack = 'rgba(255,0,255,0.16)';
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = pack;
+        const px = x + (flip ? this.width - 9 : 3);
+        ctx.fillRect(px, this.y + 14, 7, 10);
+        ctx.restore();
+      } catch (_) {}
     }
 
     _collides(obj) {

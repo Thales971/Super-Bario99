@@ -14,6 +14,35 @@ window.SuperBario99 = window.SuperBario99 || {};
   // Observação importante:
   // As fontes listadas podem não existir no dispositivo. Por isso, sempre há fallbacks.
   const THEMES = {
+    'japan-retro': {
+      id: 'japan-retro',
+      name: 'Japão Retro',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 22,
+        titleSize: 46,
+        textColor: '#ffffff',
+        textShadow: '0 2px 8px rgba(0,0,0,0.55)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.45)',
+        panelBlur: 6,
+        panelBorder: 'rgba(255,182,213,0.35)',
+        buttonBg: 'linear-gradient(45deg, rgba(255,182,213,0.90) 0%, rgba(255,238,246,0.90) 100%)',
+        buttonText: '#2b2b2b'
+      },
+      palette: {
+        skyTop: '#ffb6d5',
+        skyBottom: '#ffeef6',
+        accent: '#c0392b',
+        highlight: '#ffd27d'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
     'windows-xp': {
       id: 'windows-xp',
       name: 'Windows XP',
@@ -71,6 +100,180 @@ window.SuperBario99 = window.SuperBario99 || {};
         softGlow: true,
         scanlines: false,
         vhsGlitch: false
+      }
+    },
+
+    'fruitiger-ocean': {
+      id: 'fruitiger-ocean',
+      name: 'Fruitiger Ocean',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 24,
+        titleSize: 48,
+        textColor: '#ffffff',
+        textShadow: '0 2px 10px rgba(0,0,0,0.45)',
+        radius: 24,
+        panelBg: 'rgba(255,255,255,0.16)',
+        panelBlur: 10,
+        panelBorder: 'rgba(30,144,255,0.55)',
+        buttonBg: 'linear-gradient(45deg, #00CED1 0%, #1E90FF 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#00CED1',
+        skyBottom: '#1E90FF',
+        accent: '#FFD700',
+        highlight: '#ffffff'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
+    'fruitiger-sunset': {
+      id: 'fruitiger-sunset',
+      name: 'Fruitiger Sunset',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 24,
+        titleSize: 48,
+        textColor: '#ffffff',
+        textShadow: '0 2px 10px rgba(0,0,0,0.50)',
+        radius: 24,
+        panelBg: 'rgba(0,0,0,0.35)',
+        panelBlur: 8,
+        panelBorder: 'rgba(255,215,0,0.25)',
+        buttonBg: 'linear-gradient(45deg, #FF6347 0%, #FFA500 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#FF6347',
+        skyBottom: '#FFD700',
+        accent: '#FFA500',
+        highlight: '#ffffff'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
+    'fruitiger-neon': {
+      id: 'fruitiger-neon',
+      name: 'Fruitiger Neon',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 22,
+        titleSize: 46,
+        textColor: '#ffffff',
+        textShadow: '0 0 12px rgba(0,255,255,0.25)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.55)',
+        panelBlur: 6,
+        panelBorder: 'rgba(0,255,255,0.25)',
+        buttonBg: 'linear-gradient(45deg, #FF00FF 0%, #00FFFF 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#000000',
+        skyBottom: '#000000',
+        accent: '#00FFFF',
+        highlight: '#FF00FF'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: true,
+        vhsGlitch: true
+      }
+    },
+
+    'fruitiger-forest': {
+      id: 'fruitiger-forest',
+      name: 'Fruitiger Forest',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 24,
+        titleSize: 48,
+        textColor: '#F5F5DC',
+        textShadow: '0 2px 10px rgba(0,0,0,0.55)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.45)',
+        panelBlur: 6,
+        panelBorder: 'rgba(255,215,0,0.18)',
+        buttonBg: 'linear-gradient(45deg, #228B22 0%, #8B4513 100%)',
+        buttonText: '#F5F5DC'
+      },
+      palette: {
+        skyTop: '#228B22',
+        skyBottom: '#145a22',
+        accent: '#FFD700',
+        highlight: '#F5F5DC'
+      },
+      effects: {
+        softGlow: false,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
+    'fruitiger-galaxy': {
+      id: 'fruitiger-galaxy',
+      name: 'Fruitiger Galaxy',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 22,
+        titleSize: 46,
+        textColor: '#ffffff',
+        textShadow: '0 2px 12px rgba(0,0,0,0.60)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.50)',
+        panelBlur: 8,
+        panelBorder: 'rgba(255,215,0,0.20)',
+        buttonBg: 'linear-gradient(45deg, #4B0082 0%, #00008B 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#0b0014',
+        skyBottom: '#00008B',
+        accent: '#FFD700',
+        highlight: '#ffffff'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
+    'caos-final': {
+      id: 'caos-final',
+      name: 'Caos Final',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 22,
+        titleSize: 46,
+        textColor: '#ffffff',
+        textShadow: '0 2px 14px rgba(0,0,0,0.65)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.55)',
+        panelBlur: 8,
+        panelBorder: 'rgba(255,255,255,0.18)',
+        buttonBg: 'linear-gradient(45deg, #FF00FF 0%, #00FFFF 50%, #FFD700 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#000000',
+        skyBottom: '#111111',
+        accent: '#FFD700',
+        highlight: '#ffffff'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: true,
+        vhsGlitch: true
       }
     },
 
@@ -258,22 +461,34 @@ window.SuperBario99 = window.SuperBario99 || {};
   // -----------------------------
   // Mapeamento por fase
   // -----------------------------
-  // levelIndex: 0..49
+  // levelIndex: 0..(N-1)
   function getAestheticIdForLevel(levelIndex) {
-    const i = util.clamp(levelIndex | 0, 0, 49);
-    const block = Math.floor(i / 5);
-    return [
-      'windows-xp',
-      'fruitiger-aero',
-      'tecno-zen',
-      'dorfic',
-      'metro-aero',
-      'vaporwave',
-      'aurora-aero',
-      'windows-vista',
-      'vaporwave',
-      'aurora-aero'
-    ][block] || 'windows-xp';
+    // Mapeamento “Infinity Dimensions” (100 fases) conforme tabela:
+    // 1–10 Japão Retro
+    // 11–20 Fruitiger Aero Original
+    // 21–30 Dorfic
+    // 31–40 Metro Aero
+    // 41–49 Vaporwave
+    // 50–59 Fruitiger Ocean
+    // 60–69 Fruitiger Sunset
+    // 70–79 Fruitiger Neon
+    // 80–89 Fruitiger Forest
+    // 90–99 Fruitiger Galaxy
+    // 100 Caos Final
+    const i = util.clamp(levelIndex | 0, 0, 99);
+    const phase = i + 1;
+
+    if (phase <= 10) return 'japan-retro';
+    if (phase <= 20) return 'fruitiger-aero';
+    if (phase <= 30) return 'dorfic';
+    if (phase <= 40) return 'metro-aero';
+    if (phase <= 49) return 'vaporwave';
+    if (phase <= 59) return 'fruitiger-ocean';
+    if (phase <= 69) return 'fruitiger-sunset';
+    if (phase <= 79) return 'fruitiger-neon';
+    if (phase <= 89) return 'fruitiger-forest';
+    if (phase <= 99) return 'fruitiger-galaxy';
+    return 'caos-final';
   }
 
   function getThemeConfig(aestheticId) {
@@ -330,9 +545,57 @@ window.SuperBario99 = window.SuperBario99 || {};
     const inten = util.clamp(intensity01 == null ? 1 : intensity01, 0, 1);
 
     // Fruitiger: luz suave global
-    if (aestheticId === 'fruitiger-aero') {
+    if (aestheticId === 'fruitiger-aero' || String(aestheticId).startsWith('fruitiger-')) {
       ctx.fillStyle = `rgba(255,255,255,${0.05 * inten})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Ocean: bolhas
+    if (aestheticId === 'fruitiger-ocean') {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      const t = nowMs * 0.001;
+      for (let i = 0; i < 18; i++) {
+        const x = (i * 70 + (t * 30)) % (canvas.width + 50) - 25;
+        const y = canvas.height - ((i * 42 + (t * 80)) % (canvas.height + 60));
+        const r = 2 + (i % 4);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Sunset: raios de sol
+    if (aestheticId === 'fruitiger-sunset') {
+      ctx.fillStyle = `rgba(255,215,0,${0.06 * inten})`;
+      for (let i = 0; i < 5; i++) {
+        const sx = 80 + i * 170;
+        ctx.beginPath();
+        ctx.moveTo(sx, 0);
+        ctx.lineTo(sx + 80, 0);
+        ctx.lineTo(sx + 30, 260);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Forest: neblina leve
+    if (aestheticId === 'fruitiger-forest') {
+      const fog = ctx.createLinearGradient(0, canvas.height * 0.55, 0, canvas.height);
+      fog.addColorStop(0, 'rgba(255,255,255,0.00)');
+      fog.addColorStop(1, `rgba(245,245,220,${0.10 * inten})`);
+      ctx.fillStyle = fog;
+      ctx.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
+    }
+
+    // Galaxy: estrelas cintilantes
+    if (aestheticId === 'fruitiger-galaxy') {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      for (let i = 0; i < 46; i++) {
+        const x = (i * 37 + (nowMs * 0.03)) % canvas.width;
+        const y = (i * 19) % (canvas.height * 0.6);
+        const s = (i % 3) + 1;
+        ctx.fillRect(x, y, s, s);
+      }
     }
 
     // Vaporwave: scanlines
@@ -363,17 +626,21 @@ window.SuperBario99 = window.SuperBario99 || {};
   // -----------------------------
   function _runInlineTests() {
     try {
-      // Teste: mapping 1..50
+      // Teste: mapping 1..100
       const a1 = getAestheticIdForLevel(0);
-      const a6 = getAestheticIdForLevel(5);
-      const a35 = getAestheticIdForLevel(34);
-      const a36 = getAestheticIdForLevel(35);
+      const a10 = getAestheticIdForLevel(9);
+      const a11 = getAestheticIdForLevel(10);
+      const a49 = getAestheticIdForLevel(48);
       const a50 = getAestheticIdForLevel(49);
-      if (a1 !== 'windows-xp') throw new Error('Teste falhou: fase 1 deveria ser Windows XP');
-      if (a6 !== 'fruitiger-aero') throw new Error('Teste falhou: fase 6 deveria ser Fruitiger Aero');
-      if (a35 !== 'aurora-aero') throw new Error('Teste falhou: fase 35 deveria ser Aurora Aero');
-      if (a36 !== 'windows-vista') throw new Error('Teste falhou: fase 36 deveria ser Windows Vista');
-      if (a50 !== 'aurora-aero') throw new Error('Teste falhou: fase 50 deveria ser Aurora Aero');
+      const a99 = getAestheticIdForLevel(98);
+      const a100 = getAestheticIdForLevel(99);
+      if (a1 !== 'japan-retro') throw new Error('Teste falhou: fase 1 deveria ser Japão Retro');
+      if (a10 !== 'japan-retro') throw new Error('Teste falhou: fase 10 deveria ser Japão Retro');
+      if (a11 !== 'fruitiger-aero') throw new Error('Teste falhou: fase 11 deveria ser Fruitiger Aero');
+      if (a49 !== 'vaporwave') throw new Error('Teste falhou: fase 49 deveria ser Vaporwave');
+      if (a50 !== 'fruitiger-ocean') throw new Error('Teste falhou: fase 50 deveria ser Fruitiger Ocean');
+      if (a99 !== 'fruitiger-galaxy') throw new Error('Teste falhou: fase 99 deveria ser Fruitiger Galaxy');
+      if (a100 !== 'caos-final') throw new Error('Teste falhou: fase 100 deveria ser Caos Final');
     } catch (e) {
       console.warn('[ThemeManager] testes inline falharam:', e);
     }

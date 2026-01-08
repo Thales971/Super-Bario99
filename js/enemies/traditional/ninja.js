@@ -230,6 +230,41 @@ window.SuperBario99 = window.SuperBario99 || {};
         ? ((Math.floor(this.timer / 6) % 2) === 0 ? SPRITE.run1 : SPRITE.run2)
         : SPRITE.idle;
       _drawPixelSprite(ctx, frame, x, this.y, this.width, this.height, palette, flip);
+
+      // detalhe extra: faixa/lenço + “katana” (novo visual)
+      try {
+        let accent = eye;
+        if (v === 'japan') accent = '#c0392b';
+        else if (v === 'evil') accent = '#ff3b2f';
+        else if (v === 'tecnozen') accent = '#23d5ff';
+        else if (v === 'metro') accent = '#4aa3ff';
+        else if (v === 'vaporwave') accent = '#FF00FF';
+        else if (v === 'fruitiger') accent = '#6fe7ff';
+        else if (v === 'windows-xp') accent = '#0055E5';
+        else if (v === 'windows-vista') accent = '#0078D7';
+        else if (v === 'aurora-aero') accent = '#FFD700';
+
+        // faixa na testa
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = accent;
+        const hx = x + (flip ? 6 : 8);
+        ctx.fillRect(hx, this.y + 8, 14, 3);
+        // ponta do lenço
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(hx + (flip ? -4 : 14), this.y + 9, 4, 2);
+
+        // katana nas costas
+        ctx.globalAlpha = 0.65;
+        ctx.strokeStyle = 'rgba(245,246,250,0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const kx = x + (flip ? this.width - 6 : 6);
+        ctx.moveTo(kx, this.y + 14);
+        ctx.lineTo(kx + (flip ? -10 : 10), this.y + 26);
+        ctx.stroke();
+        ctx.restore();
+      } catch (_) {}
     }
 
     _collides(obj) {
