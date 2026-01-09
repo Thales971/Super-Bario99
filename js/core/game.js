@@ -75,6 +75,8 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       // Seed dinâmico por fase (para layout variar a cada tentativa)
       this.levelSeed = 0;
+      // Seed por run (mantém consistência dentro da run e permite variação entre runs)
+      this._runSeed = 0;
       this._nextAutosaveAt = 0;
       this._lastLives = null;
 
@@ -1126,6 +1128,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       this._isFreeMode = false;
       this._freeConfig = null;
       this.levelIndex = 0;
+      this._runSeed = this._makeSeed();
       this.levelSeed = this._makeSeed();
       this._regenLevelForCurrentSeed();
       {
@@ -1181,6 +1184,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.gravity = isFinite(g) ? g : 0.8;
 
       // Seed nova para começar o sandbox
+      this._runSeed = this._makeSeed();
       this.levelSeed = this._makeSeed();
       this._regenLevelForCurrentSeed();
 
@@ -1252,6 +1256,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         this._isFreeMode = false;
         this._freeConfig = null;
         this.levelIndex = data.levelIndex || 0;
+        this._runSeed = (data.runSeed >>> 0) || this._makeSeed();
         this.levelSeed = (data.levelSeed >>> 0) || this._makeSeed();
         this._regenLevelForCurrentSeed();
         {
@@ -1303,6 +1308,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         levelIndex: this.levelIndex,
         score: this.player.score,
         lives: this.player.lives,
+        runSeed: this._runSeed >>> 0,
         levelSeed: this.levelSeed >>> 0,
         savedAt: Date.now()
       };
@@ -1355,7 +1361,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       const aestheticId = this._getEffectiveAestheticId ? this._getEffectiveAestheticId(level, tNow) : (level.aestheticId || level.themeId);
       const bossCfg = (SuperBario99.bossesV2 && SuperBario99.bossesV2.getBossForLevel) ? SuperBario99.bossesV2.getBossForLevel(levelIndex) : null;
 
-      const configs = SuperBario99.loreV2.getNpcConfigsForLevel(levelIndex, aestheticId, level, bossCfg) || [];
+      const configs = SuperBario99.loreV2.getNpcConfigsForLevel(levelIndex, aestheticId, level, bossCfg, this._runSeed) || [];
       const ww = Number(level.worldWidth || this._logicalW || 800);
       const npcW = 32;
       const npcH = 52;

@@ -15,9 +15,18 @@ window.SuperBario99 = window.SuperBario99 || {};
     return h >>> 0;
   }
 
-  function _rngFrom(levelIndex, aestheticId) {
+  function _rngFromBase(levelIndex, aestheticId) {
     let seed = ((levelIndex + 1) * 1103515245) ^ _hashStr32(aestheticId);
     seed >>>= 0;
+    return () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+  }
+
+  function _rngFromFlavor(levelIndex, aestheticId, runSeed) {
+    const rs = (runSeed >>> 0) || 0;
+    let seed = (((levelIndex + 1) * 1103515245) ^ _hashStr32(aestheticId) ^ rs ^ 0xa5a5a5a5) >>> 0;
     return () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       return seed / 4294967296;
@@ -64,8 +73,9 @@ window.SuperBario99 = window.SuperBario99 || {};
     return 'generic';
   }
 
-  function getNpcConfigsForLevel(levelIndex, aestheticId, level, bossCfg) {
-    const rng = _rngFrom(levelIndex, aestheticId);
+  function getNpcConfigsForLevel(levelIndex, aestheticId, level, bossCfg, runSeed) {
+    const rng = _rngFromBase(levelIndex, aestheticId);
+    const rngFlavor = _rngFromFlavor(levelIndex, aestheticId, runSeed);
     const prettyAesthetic = _formatAesthetic(aestheticId);
     const aKey = _aestheticKey(aestheticId);
 
@@ -296,10 +306,10 @@ window.SuperBario99 = window.SuperBario99 || {};
         return 'calm';
       })();
 
-      // Insere uma catchphrase curta depois do cabeçalho
+      // Insere uma catchphrase curta depois do cabeçalho (varia por run)
       if (lines && lines.length >= 1) {
         const c = catchByVoice[v];
-        if (c) lines.splice(1, 0, c);
+        if (c && rngFlavor() < 0.85) lines.splice(1, 0, c);
       }
 
       // Ajustes sutis de pontuação/ritmo (sem virar meme)
@@ -308,19 +318,19 @@ window.SuperBario99 = window.SuperBario99 || {};
         if (!s) continue;
 
         if (mood === 'energetic') {
-          if (!/[.!?]$/.test(s) && rng() < 0.55) s += '!';
-          if (rng() < 0.18) s = s.replace(/^Você /, 'Você aí, ');
+          if (!/[.!?]$/.test(s) && rngFlavor() < 0.55) s += '!';
+          if (rngFlavor() < 0.18) s = s.replace(/^Você /, 'Você aí, ');
         } else if (mood === 'grumpy') {
-          if (!/[.!?]$/.test(s) && rng() < 0.45) s += '.';
-          if (rng() < 0.22) s = s.replace(/^Se /, 'Se '); // no-op (mantém determinismo)
-          if (rng() < 0.18) s = 'Hmph. ' + s.charAt(0).toLowerCase() + s.slice(1);
+          if (!/[.!?]$/.test(s) && rngFlavor() < 0.45) s += '.';
+          if (rngFlavor() < 0.22) s = s.replace(/^Se /, 'Se '); // no-op (mantém determinismo)
+          if (rngFlavor() < 0.18) s = 'Hmph. ' + s.charAt(0).toLowerCase() + s.slice(1);
         } else if (mood === 'mysterious') {
-          if (rng() < 0.35 && !s.startsWith('…') && !s.startsWith('...')) s = '... ' + s;
-          if (!/[.!?]$/.test(s) && rng() < 0.30) s += '…';
+          if (rngFlavor() < 0.35 && !s.startsWith('…') && !s.startsWith('...')) s = '... ' + s;
+          if (!/[.!?]$/.test(s) && rngFlavor() < 0.30) s += '…';
         } else {
           // calm
-          if (!/[.!?]$/.test(s) && rng() < 0.25) s += '.';
-          if (rng() < 0.12) s = s.replace('não é', 'não é só');
+          if (!/[.!?]$/.test(s) && rngFlavor() < 0.25) s += '.';
+          if (rngFlavor() < 0.12) s = s.replace('não é', 'não é só');
         }
 
         lines[i] = s;
@@ -343,6 +353,68 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       for (const s of picks) {
         if (s && lines.indexOf(s) < 0) lines.push(s);
+      }
+
+      // Variação por run, sem trocar a “verdade” da fase (só muda o foco)
+      const vibeByVoice = {
+        map: [
+          'Hoje o mapa parece outro, mas as regras são as mesmas. Olha o padrão.',
+          'Se algo parecer diferente hoje, é só a dimensão reorganizando a lição.'
+        ],
+        engine: [
+          'Nota técnica da run: quando tudo muda, volta pro básico e mede de novo.',
+          'Se o loop estiver esquisito hoje, simplifica: chão, timing, saída.'
+        ],
+        monk: [
+          'Run do dia: calma primeiro, velocidade depois.',
+          'Se a fase apertar hoje, respira e retoma o ritmo.'
+        ],
+        glitch: [
+          'Hoje tem ruído extra. Não entra em pânico: lê o padrão.',
+          'Se o mundo “falhar” hoje, usa a falha como seta, não como desculpa.'
+        ],
+        guard: [
+          'Regra da run: sem pressa. Sem heroísmo. Só clareza.',
+          'Se você ficar ansioso hoje, a fase ganha. Mantém a postura.'
+        ],
+        arch: [
+          'Cada run muda o que você percebe. Usa isso a seu favor.',
+          'Hoje a história aparece nas bordas: presta atenção nos detalhes.'
+        ],
+        wander: [
+          'Essa run te dá uma chance diferente de aprender o mesmo salto.',
+          'Se cair hoje, cai anotando: você volta mais forte.'
+        ],
+        messenger: [
+          'Recado da run: timing vence impulso. Sempre.',
+          'Hoje a dimensão vai tentar te apressar. Não compra a ideia.'
+        ],
+        observer: [
+          'Observação da run: o padrão muda antes do perigo mudar.',
+          'Se você estiver lendo bem hoje, metade da fase já perdeu.'
+        ],
+        smith: [
+          'Truque da run: golpe simples, intenção firme.',
+          'Se a fase irritar hoje, devolve com consistência.'
+        ],
+        witness: [
+          'Hoje o medo quer falar alto. Não deixa.',
+          'Se algo te encarar hoje, encare de volta e siga.'
+        ],
+        audio: [
+          'Run com dica de som: o SFX costuma avisar antes do olho perceber.',
+          'Se você ouvir o perigo hoje, você chega antes dele.'
+        ],
+        generic: [
+          'Essa run não muda a verdade — muda o caminho até ela.',
+          'Hoje o loop te testa no detalhe. Não deixa passar.'
+        ]
+      };
+      const vv = String(voice || 'generic').toLowerCase();
+      const pool = vibeByVoice[vv] || vibeByVoice.generic;
+      if (!isDisg && rngFlavor() < 0.60) {
+        const vibe = _pick(rngFlavor, pool);
+        if (vibe && lines.indexOf(vibe) < 0) lines.push(vibe);
       }
 
       // assinatura
