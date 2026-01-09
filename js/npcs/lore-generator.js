@@ -268,6 +268,68 @@ window.SuperBario99 = window.SuperBario99 || {};
       'Eu não sou daqui. Eu só aprendi a parecer.'
     ];
 
+    const styleLines = (voice, lines, isDisg) => {
+      const v = String(voice || '').toLowerCase();
+
+      const catchByVoice = {
+        map: 'Deixa eu te situar rapidinho.',
+        engine: 'Ok. Diagnóstico rápido.',
+        monk: 'Respira… e ouve.',
+        glitch: 'Shh. Escuta o erro.',
+        guard: 'Fica atento.',
+        arch: 'Isso aqui tem história.',
+        wander: 'Eu já vi essa queda.',
+        messenger: 'Cheguei correndo com um recado!',
+        observer: 'Observação objetiva.',
+        smith: 'Trabalho limpo, golpe simples.',
+        witness: 'Eu vi o que mora aqui.',
+        audio: 'Ouvidos abertos: o som entrega a fase.'
+      };
+
+      const mood = (() => {
+        if (isDisg) return 'mysterious';
+        if (v === 'engine' || v === 'messenger' || v === 'audio') return 'energetic';
+        if (v === 'guard' || v === 'smith') return 'grumpy';
+        if (v === 'glitch' || v === 'witness') return 'mysterious';
+        if (v === 'monk') return 'calm';
+        if (v === 'arch' || v === 'map' || v === 'observer') return 'calm';
+        return 'calm';
+      })();
+
+      // Insere uma catchphrase curta depois do cabeçalho
+      if (lines && lines.length >= 1) {
+        const c = catchByVoice[v];
+        if (c) lines.splice(1, 0, c);
+      }
+
+      // Ajustes sutis de pontuação/ritmo (sem virar meme)
+      for (let i = 1; i < lines.length; i++) {
+        let s = String(lines[i] || '');
+        if (!s) continue;
+
+        if (mood === 'energetic') {
+          if (!/[.!?]$/.test(s) && rng() < 0.55) s += '!';
+          if (rng() < 0.18) s = s.replace(/^Você /, 'Você aí, ');
+        } else if (mood === 'grumpy') {
+          if (!/[.!?]$/.test(s) && rng() < 0.45) s += '.';
+          if (rng() < 0.22) s = s.replace(/^Se /, 'Se '); // no-op (mantém determinismo)
+          if (rng() < 0.18) s = 'Hmph. ' + s.charAt(0).toLowerCase() + s.slice(1);
+        } else if (mood === 'mysterious') {
+          if (rng() < 0.35 && !s.startsWith('…') && !s.startsWith('...')) s = '... ' + s;
+          if (!/[.!?]$/.test(s) && rng() < 0.30) s += '…';
+        } else {
+          // calm
+          if (!/[.!?]$/.test(s) && rng() < 0.25) s += '.';
+          if (rng() < 0.12) s = s.replace('não é', 'não é só');
+        }
+
+        lines[i] = s;
+      }
+
+      // limita tamanho final
+      return lines.slice(0, 5);
+    };
+
     const mkLines = (voice, isDisg) => {
       const lines = [];
       lines.push(`${chapter} — ${dimension}.`);
@@ -305,13 +367,14 @@ window.SuperBario99 = window.SuperBario99 || {};
         lines.push(end);
       }
 
-      // garante tamanho razoável (não vira text wall)
-      return lines.slice(0, 5);
+      // estilo / personalidade (por voz)
+      return styleLines(voice, lines, isDisg);
     };
 
     const npcA = {
       id: `npc_${levelIndex}_a`,
       name: a.name,
+      voice: a.voice,
       lines: mkLines(a.voice, false),
       disguised: false,
       variantSeed: (_hashStr32(a.name) ^ (levelIndex * 997)) >>> 0
@@ -320,6 +383,7 @@ window.SuperBario99 = window.SuperBario99 || {};
     const npcB = {
       id: `npc_${levelIndex}_b`,
       name: b.name,
+      voice: b.voice,
       lines: mkLines(b.voice, disguised),
       disguised,
       variantSeed: (_hashStr32(b.name) ^ (levelIndex * 1319)) >>> 0

@@ -14,6 +14,93 @@ window.SuperBario99 = window.SuperBario99 || {};
   // Observação importante:
   // As fontes listadas podem não existir no dispositivo. Por isso, sempre há fallbacks.
   const THEMES = {
+    'secret-void': {
+      id: 'secret-void',
+      name: 'Secret: Void',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 22,
+        titleSize: 46,
+        textColor: '#ffffff',
+        textShadow: '0 2px 14px rgba(0,0,0,0.70)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.55)',
+        panelBlur: 10,
+        panelBorder: 'rgba(138,43,226,0.28)',
+        buttonBg: 'linear-gradient(45deg, rgba(75,0,130,0.95) 0%, rgba(138,43,226,0.95) 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#05030a',
+        skyBottom: '#140824',
+        accent: '#8a2be2',
+        highlight: '#ffffff'
+      },
+      effects: {
+        softGlow: false,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
+    'secret-terminal': {
+      id: 'secret-terminal',
+      name: 'Secret: Terminal',
+      ui: {
+        fontFamily: "Consolas, 'Courier New', monospace",
+        uiSize: 18,
+        titleSize: 38,
+        textColor: '#39FF14',
+        textShadow: '0 0 12px rgba(57,255,20,0.18)',
+        radius: 10,
+        panelBg: 'rgba(0,0,0,0.68)',
+        panelBlur: 6,
+        panelBorder: 'rgba(57,255,20,0.22)',
+        buttonBg: 'linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(10,18,10,0.92) 100%)',
+        buttonText: '#39FF14'
+      },
+      palette: {
+        skyTop: '#000000',
+        skyBottom: '#050a05',
+        accent: '#39FF14',
+        highlight: '#b9ffb0'
+      },
+      effects: {
+        softGlow: false,
+        scanlines: true,
+        vhsGlitch: false
+      }
+    },
+
+    'secret-amber': {
+      id: 'secret-amber',
+      name: 'Secret: Amber',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 22,
+        titleSize: 44,
+        textColor: '#2b2b2b',
+        textShadow: 'none',
+        radius: 18,
+        panelBg: 'rgba(255,255,255,0.18)',
+        panelBlur: 10,
+        panelBorder: 'rgba(255,215,0,0.28)',
+        buttonBg: 'linear-gradient(45deg, rgba(255,215,0,0.92) 0%, rgba(255,140,0,0.92) 100%)',
+        buttonText: '#2b2b2b'
+      },
+      palette: {
+        skyTop: '#ffcc66',
+        skyBottom: '#ff8c00',
+        accent: '#FFD700',
+        highlight: '#ffffff'
+      },
+      effects: {
+        softGlow: true,
+        scanlines: false,
+        vhsGlitch: false
+      }
+    },
+
     'japan-retro': {
       id: 'japan-retro',
       name: 'Japão Retro',
@@ -459,6 +546,86 @@ window.SuperBario99 = window.SuperBario99 || {};
   };
 
   // -----------------------------
+  // Estéticas secretas (não aparecem no seletor do modo livre)
+  // -----------------------------
+  const SECRET_THEMES = {
+    'secret-void': {
+      id: 'secret-void',
+      name: 'Vazio (Secreto)',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 20,
+        titleSize: 42,
+        textColor: '#ffffff',
+        textShadow: '0 2px 12px rgba(0,0,0,0.70)',
+        radius: 18,
+        panelBg: 'rgba(0,0,0,0.55)',
+        panelBlur: 8,
+        panelBorder: 'rgba(255,255,255,0.18)',
+        buttonBg: 'linear-gradient(45deg, rgba(20,16,24,0.95) 0%, rgba(11,0,20,0.95) 100%)',
+        buttonText: '#ffffff'
+      },
+      palette: {
+        skyTop: '#0b0014',
+        skyBottom: '#141018',
+        accent: '#C0C0C0',
+        highlight: '#ffffff'
+      },
+      effects: { softGlow: true, scanlines: false, vhsGlitch: false }
+    },
+
+    'secret-terminal': {
+      id: 'secret-terminal',
+      name: 'Terminal (Secreto)',
+      ui: {
+        fontFamily: "Consolas, 'Courier New', monospace",
+        uiSize: 18,
+        titleSize: 38,
+        textColor: '#39FF14',
+        textShadow: '0 0 12px rgba(57,255,20,0.25)',
+        radius: 12,
+        panelBg: 'rgba(0,0,0,0.70)',
+        panelBlur: 6,
+        panelBorder: 'rgba(57,255,20,0.20)',
+        buttonBg: 'linear-gradient(180deg, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.98) 100%)',
+        buttonText: '#39FF14'
+      },
+      palette: {
+        skyTop: '#000000',
+        skyBottom: '#0a0a0a',
+        accent: '#39FF14',
+        highlight: '#C0C0C0'
+      },
+      effects: { softGlow: false, scanlines: true, vhsGlitch: false }
+    },
+
+    'secret-amber': {
+      id: 'secret-amber',
+      name: 'Âmbar (Secreto)',
+      ui: {
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        uiSize: 20,
+        titleSize: 40,
+        textColor: '#2b2b2b',
+        textShadow: 'none',
+        radius: 18,
+        panelBg: 'rgba(255,215,0,0.22)',
+        panelBlur: 8,
+        panelBorder: 'rgba(0,0,0,0.18)',
+        buttonBg: 'linear-gradient(45deg, rgba(255,215,0,0.95) 0%, rgba(255,238,246,0.90) 100%)',
+        buttonText: '#2b2b2b'
+      },
+      palette: {
+        skyTop: '#FFD700',
+        skyBottom: '#FFB347',
+        accent: '#c0392b',
+        highlight: '#ffffff'
+      },
+      effects: { softGlow: true, scanlines: false, vhsGlitch: false }
+    }
+  };
+
+  // -----------------------------
   // Mapeamento por fase
   // -----------------------------
   // levelIndex: 0..(N-1)
@@ -492,7 +659,7 @@ window.SuperBario99 = window.SuperBario99 || {};
   }
 
   function getThemeConfig(aestheticId) {
-    return THEMES[aestheticId] || THEMES['windows-xp'];
+    return THEMES[aestheticId] || SECRET_THEMES[aestheticId] || THEMES['windows-xp'];
   }
 
   function _setCssVar(root, key, value) {
@@ -544,10 +711,61 @@ window.SuperBario99 = window.SuperBario99 || {};
     const cfg = getThemeConfig(aestheticId);
     const inten = util.clamp(intensity01 == null ? 1 : intensity01, 0, 1);
 
+    const w = (canvas && Number.isFinite(canvas._sb99LogicalWidth)) ? canvas._sb99LogicalWidth : (canvas ? canvas.width : 800);
+    const h = (canvas && Number.isFinite(canvas._sb99LogicalHeight)) ? canvas._sb99LogicalHeight : (canvas ? canvas.height : 450);
+
     // Fruitiger: luz suave global
     if (aestheticId === 'fruitiger-aero' || String(aestheticId).startsWith('fruitiger-')) {
       ctx.fillStyle = `rgba(255,255,255,${0.05 * inten})`;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Secret Void: vinheta + poeira estelar
+    if (aestheticId === 'secret-void') {
+      const g = ctx.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.12, w * 0.5, h * 0.45, Math.max(w, h) * 0.72);
+      g.addColorStop(0, 'rgba(0,0,0,0.00)');
+      g.addColorStop(1, `rgba(0,0,0,${0.42 * inten})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = `rgba(255,255,255,${0.16 * inten})`;
+      for (let i = 0; i < 34; i++) {
+        const x = (i * 53 + (nowMs * 0.02)) % w;
+        const y = (i * 29 + (nowMs * 0.015)) % (h * 0.75);
+        const s = (i % 2) + 1;
+        ctx.fillRect(x, y, s, s);
+      }
+    }
+
+    // Secret Terminal: cursor/linhas leves (scanlines já vem via effects)
+    if (aestheticId === 'secret-terminal') {
+      const t = Math.floor(nowMs / 300) % 8;
+      const cy = 60 + t * 34;
+      ctx.fillStyle = `rgba(57,255,20,${0.06 * inten})`;
+      ctx.fillRect(0, cy, w, 2);
+      ctx.fillRect(30, cy + 10, Math.min(260, w - 60), 2);
+      ctx.fillStyle = `rgba(57,255,20,${0.10 * inten})`;
+      ctx.fillRect(40 + ((nowMs * 0.08) % (w - 80)), cy - 10, 8, 18);
+    }
+
+    // Secret Amber: brilho quente + partículas de poeira
+    if (aestheticId === 'secret-amber') {
+      ctx.fillStyle = `rgba(255,255,255,${0.06 * inten})`;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = `rgba(0,0,0,${0.08 * inten})`;
+      ctx.fillRect(0, h * 0.62, w, h * 0.38);
+
+      ctx.fillStyle = `rgba(255,255,255,${0.22 * inten})`;
+      const tt = nowMs * 0.001;
+      for (let i = 0; i < 22; i++) {
+        const x = (i * 70 + (tt * 22)) % (w + 40) - 20;
+        const y = h * 0.25 + ((i * 33 + (tt * 18)) % (h * 0.65));
+        const r = 1 + (i % 3);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Ocean: bolhas
@@ -555,8 +773,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
       const t = nowMs * 0.001;
       for (let i = 0; i < 18; i++) {
-        const x = (i * 70 + (t * 30)) % (canvas.width + 50) - 25;
-        const y = canvas.height - ((i * 42 + (t * 80)) % (canvas.height + 60));
+        const x = (i * 70 + (t * 30)) % (w + 50) - 25;
+        const y = h - ((i * 42 + (t * 80)) % (h + 60));
         const r = 2 + (i % 4);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -580,29 +798,57 @@ window.SuperBario99 = window.SuperBario99 || {};
 
     // Forest: neblina leve
     if (aestheticId === 'fruitiger-forest') {
-      const fog = ctx.createLinearGradient(0, canvas.height * 0.55, 0, canvas.height);
+      const fog = ctx.createLinearGradient(0, h * 0.55, 0, h);
       fog.addColorStop(0, 'rgba(255,255,255,0.00)');
       fog.addColorStop(1, `rgba(245,245,220,${0.10 * inten})`);
       ctx.fillStyle = fog;
-      ctx.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
+      ctx.fillRect(0, h * 0.55, w, h * 0.45);
     }
 
     // Galaxy: estrelas cintilantes
     if (aestheticId === 'fruitiger-galaxy') {
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
       for (let i = 0; i < 46; i++) {
-        const x = (i * 37 + (nowMs * 0.03)) % canvas.width;
-        const y = (i * 19) % (canvas.height * 0.6);
+        const x = (i * 37 + (nowMs * 0.03)) % w;
+        const y = (i * 19) % (h * 0.6);
         const s = (i % 3) + 1;
         ctx.fillRect(x, y, s, s);
       }
     }
 
+    // Secreto: Void (estrelas + vinheta leve)
+    if (aestheticId === 'secret-void') {
+      ctx.fillStyle = `rgba(0,0,0,${0.10 * inten})`;
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.70)';
+      for (let i = 0; i < 30; i++) {
+        const x = (i * 53 + (nowMs * 0.02)) % w;
+        const y = (i * 31) % (h * 0.65);
+        const s = (i % 2) + 1;
+        ctx.fillRect(x, y, s, s);
+      }
+    }
+
+    // Secreto: Terminal (scanlines já vêm do cfg.effects.scanlines)
+    if (aestheticId === 'secret-terminal') {
+      ctx.fillStyle = `rgba(57,255,20,${0.03 * inten})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Secreto: Âmbar (brilho quente)
+    if (aestheticId === 'secret-amber') {
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, `rgba(255,215,0,${0.08 * inten})`);
+      g.addColorStop(1, `rgba(255,179,71,${0.06 * inten})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+
     // Vaporwave: scanlines
     if (cfg.effects.scanlines) {
       ctx.fillStyle = `rgba(0,0,0,${0.14 * inten})`;
-      for (let y = 0; y < canvas.height; y += 3) {
-        ctx.fillRect(0, y, canvas.width, 1);
+      for (let y = 0; y < h; y += 3) {
+        ctx.fillRect(0, y, w, 1);
       }
     }
 
@@ -612,10 +858,10 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (t === 0) {
         ctx.fillStyle = `rgba(0,0,0,${0.12 * inten})`;
         for (let i = 0; i < 10; i++) {
-          const h = 6 + (i % 3) * 4;
-          const y = (i * 36) % canvas.height;
-          const x = ((nowMs * 0.12) + i * 40) % canvas.width;
-          ctx.fillRect(x - 80, y, 160, h);
+          const hh = 6 + (i % 3) * 4;
+          const y = (i * 36) % h;
+          const x = ((nowMs * 0.12) + i * 40) % w;
+          ctx.fillRect(x - 80, y, 160, hh);
         }
       }
     }

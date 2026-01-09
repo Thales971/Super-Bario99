@@ -167,6 +167,35 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.jumpForce = 15;
       this.onGround = false;
 
+      // Classe / cosméticos
+      this._sb99Class = 'bario';
+      this._sb99Cosmetics = { palette: 'default', hat: 'none' };
+      this._sb99BaseStats = {
+        maxSpeed: this.maxSpeed,
+        accelGround: this.accelGround,
+        accelAir: this.accelAir,
+        frictionGround: this.frictionGround,
+        frictionAir: this.frictionAir,
+        jumpForce: this.jumpForce
+      };
+
+      // Habilidades
+      this._sb99JumpCount = 0;
+      this._sb99MaxJumps = 2; // default: double jump leve
+      this._sb99JumpWasDown = false;
+      this._sb99DashWasDown = false;
+      this._sb99SkillWasDown = false;
+      this._sb99DashUntil = 0;
+      this._sb99DashCdUntil = 0;
+      this._sb99DashDir = 1;
+      this._sb99WallJumpUntil = 0;
+      this._sb99TouchWallLeft = false;
+      this._sb99TouchWallRight = false;
+
+      // Ninja: invisibilidade de classe
+      this._sb99ClassInvisUntil = 0;
+      this._sb99ClassSkillCdUntil = 0;
+
       this.direction = 'right';
       this.score = 0;
       this.lives = 10;
@@ -188,6 +217,46 @@ window.SuperBario99 = window.SuperBario99 || {};
       // squash & stretch (simples)
       this.squashTimer = 0;
       this.stretchTimer = 0;
+
+      // água/nado
+      this._sb99SwimCooldown = 0;
+    }
+
+    configure(opt) {
+      const cls = String(opt?.playerClass || opt?.classId || 'bario');
+      const palette = String(opt?.palette || 'default');
+      const hatRaw = opt?.hat;
+      const hat = (typeof hatRaw === 'string')
+        ? hatRaw
+        : (hatRaw ? 'cap' : 'none');
+
+      this._sb99Class = cls;
+      this._sb99Cosmetics = { palette, hat };
+
+      // restaura base
+      const b = this._sb99BaseStats;
+      this.maxSpeed = b.maxSpeed;
+      this.accelGround = b.accelGround;
+      this.accelAir = b.accelAir;
+      this.frictionGround = b.frictionGround;
+      this.frictionAir = b.frictionAir;
+      this.jumpForce = b.jumpForce;
+
+      // defaults por classe
+      if (cls === 'ninja') {
+        this.jumpForce = b.jumpForce * 1.12;
+        this.maxSpeed = b.maxSpeed * 1.06;
+        this._sb99MaxJumps = 3; // triple jump
+      } else if (cls === 'engineer') {
+        this.maxSpeed = b.maxSpeed * 0.98;
+        this._sb99MaxJumps = 2;
+      } else if (cls === 'mage') {
+        this.maxSpeed = b.maxSpeed * 0.98;
+        this._sb99MaxJumps = 2;
+      } else {
+        // bario
+        this._sb99MaxJumps = 2;
+      }
     }
 
     update(gravity, level, keys, canvasHeight = 450, audio = null, now = 0, mod = null) {
@@ -196,37 +265,83 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (this.attackTime > 0) this.attackTime--;
       if (this.squashTimer > 0) this.squashTimer--;
       if (this.stretchTimer > 0) this.stretchTimer--;
+      if (this._sb99SwimCooldown > 0) this._sb99SwimCooldown--;
 
       const baseScale = (mod && typeof mod.speedScale === 'number') ? mod.speedScale : 1;
       const tNow = (typeof now === 'number' && isFinite(now)) ? now : performance.now();
       const statusScale = (this._sb99SlowUntil && tNow < this._sb99SlowUntil) ? 0.62 : 1;
       const speedScale = baseScale * statusScale;
 
+      const inWater = !!(mod && mod.inWater);
+      const waterResistance = (mod && Number.isFinite(Number(mod.waterResistance))) ? Math.max(0, Math.min(0.9, Number(mod.waterResistance))) : 0;
+
       this._isMoving = false;
+
+      // Estados de parede (wall jump)
+      this._sb99TouchWallLeft = false;
+      this._sb99TouchWallRight = false;
 
       // Entrada
       const stunned = (this._sb99StunUntil && tNow < this._sb99StunUntil);
       const left = stunned ? false : !!keys['ArrowLeft'];
       const right = stunned ? false : !!keys['ArrowRight'];
 
-      // Movimento horizontal (aceleração)
-      const accel = this.onGround ? this.accelGround : this.accelAir;
-      if (left && !right) {
-        this.vx -= accel;
-        this.direction = 'left';
+      const jumpDown = stunned ? false : (!!keys[' '] || !!keys['ArrowUp']);
+      const jumpJust = jumpDown && !this._sb99JumpWasDown;
+
+      const dashDown = stunned ? false : (!!keys['Shift'] || !!keys['z'] || !!keys['Z']);
+      const dashJust = dashDown && !this._sb99DashWasDown;
+
+      const skillDown = stunned ? false : (!!keys['c'] || !!keys['C']);
+      const skillJust = skillDown && !this._sb99SkillWasDown;
+
+      // Ninja: skill = invisibilidade temporária
+      if (skillJust && this._sb99Class === 'ninja') {
+        if (!this._sb99ClassSkillCdUntil || tNow >= this._sb99ClassSkillCdUntil) {
+          this._sb99ClassInvisUntil = tNow + 3000;
+          this._sb99ClassSkillCdUntil = tNow + 10000;
+          try { audio?.playSfx?.('ninjaUse'); } catch (_) {}
+        }
+      }
+
+      // Dash
+      if (dashJust && (!this._sb99DashCdUntil || tNow >= this._sb99DashCdUntil)) {
+        const dir = (left && !right) ? -1 : (right && !left) ? 1 : (this.direction === 'left' ? -1 : 1);
+        this._sb99DashDir = dir;
+        this._sb99DashUntil = tNow + 160;
+        this._sb99DashCdUntil = tNow + 5000;
+        try { audio?.playSfx?.('ninjaUse'); } catch (_) {}
+      }
+
+      const dashing = (this._sb99DashUntil && tNow < this._sb99DashUntil);
+      if (dashing) {
+        const dashSpeed = 11.0 * Math.max(0.65, Math.min(1.15, speedScale));
+        this.vx = this._sb99DashDir * dashSpeed;
         this._isMoving = true;
-      } else if (right && !left) {
-        this.vx += accel;
-        this.direction = 'right';
-        this._isMoving = true;
+        this.direction = (this._sb99DashDir < 0) ? 'left' : 'right';
       } else {
-        // atrito
-        this.vx *= (this.onGround ? this.frictionGround : this.frictionAir);
-        if (Math.abs(this.vx) < 0.03) this.vx = 0;
+        // Movimento horizontal (aceleração)
+        let accel = this.onGround ? this.accelGround : this.accelAir;
+        if (inWater) accel *= 0.55;
+        if (left && !right) {
+          this.vx -= accel;
+          this.direction = 'left';
+          this._isMoving = true;
+        } else if (right && !left) {
+          this.vx += accel;
+          this.direction = 'right';
+          this._isMoving = true;
+        } else {
+          // atrito
+          const fr = inWater ? (0.90 - waterResistance * 0.10) : (this.onGround ? this.frictionGround : this.frictionAir);
+          this.vx *= fr;
+          if (Math.abs(this.vx) < 0.03) this.vx = 0;
+        }
       }
 
       // clamp velocidade (clima pode reduzir movimentação)
-      const maxSpeed = this.maxSpeed * Math.max(0.55, Math.min(1.2, speedScale));
+      let maxSpeed = this.maxSpeed * Math.max(0.55, Math.min(1.2, speedScale));
+      if (inWater) maxSpeed *= (1 - 0.22 * waterResistance);
       if (this.vx > maxSpeed) this.vx = maxSpeed;
       if (this.vx < -maxSpeed) this.vx = -maxSpeed;
 
@@ -238,11 +353,14 @@ window.SuperBario99 = window.SuperBario99 || {};
       // eixo X
       this.x += this.vx;
       for (const p of level.platforms) {
+        if (p && p.sb99Solid === false) continue;
         if (!this._collides(p)) continue;
         if (this.vx > 0) {
+          this._sb99TouchWallRight = true;
           this.x = p.x - this.width;
           this.vx = 0;
         } else if (this.vx < 0) {
+          this._sb99TouchWallLeft = true;
           this.x = p.x + p.width;
           this.vx = 0;
         }
@@ -252,7 +370,18 @@ window.SuperBario99 = window.SuperBario99 || {};
       const prevY = this.y;
       const prevTop = prevY;
       const prevBottom = prevY + this.height;
-      this.vy += gravity;
+
+      // Física na água: mantém compatibilidade (só altera quando inWater)
+      let g = gravity;
+      if (inWater && g > 0.45) g = g * 0.35;
+      this.vy += g;
+
+      if (inWater) {
+        // arrasto e limite de queda (evita “pedra”)
+        this.vy *= (0.90 - waterResistance * 0.10);
+        const fallCap = 6.0;
+        if (this.vy > fallCap) this.vy = fallCap;
+      }
       this.y += this.vy;
 
       const wasOnGround = this.onGround;
@@ -267,6 +396,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // caindo: escolhe a plataforma mais alta (menor y) que foi atingida por cima
         let best = null;
         for (const p of level.platforms) {
+          if (p && p.sb99Solid === false) continue;
           if (!this._collides(p)) continue;
           // landing: precisa ter cruzado o topo da plataforma vindo de cima
           const crossedTop = (prevBottom <= p.y + eps) && ((this.y + this.height) >= p.y - 1);
@@ -285,6 +415,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // subindo: escolhe a plataforma mais baixa (maior y+height) atingida por baixo
         let best = null;
         for (const p of level.platforms) {
+          if (p && p.sb99Solid === false) continue;
           if (!this._collides(p)) continue;
           // head-bump: precisa ter cruzado a base da plataforma vindo de baixo
           const crossedBottom = (prevTop >= (p.y + p.height) - eps) && (this.y <= (p.y + p.height) + 1);
@@ -312,7 +443,36 @@ window.SuperBario99 = window.SuperBario99 || {};
       // squash ao aterrissar
       if (!wasOnGround && this.onGround) {
         this.squashTimer = 8;
+        this._sb99JumpCount = 0;
       }
+
+      // Jump / wall jump (edge)
+      if (jumpJust) {
+        const canWall = (!this.onGround) && (this._sb99TouchWallLeft || this._sb99TouchWallRight) && (!this._sb99WallJumpUntil || tNow >= this._sb99WallJumpUntil);
+        if (canWall) {
+          const away = this._sb99TouchWallLeft ? 1 : -1;
+          this.vx = away * 6.8;
+          this.vy = -this.jumpForce * 0.95;
+          this._sb99WallJumpUntil = tNow + 180;
+          this._sb99JumpCount = Math.min(this._sb99MaxJumps, this._sb99JumpCount + 1);
+          this.stretchTimer = 8;
+          try { audio?.playSfx?.('jump'); } catch (_) {}
+        } else {
+          if (this.onGround || this._sb99JumpCount < this._sb99MaxJumps) {
+            const idx = this._sb99JumpCount;
+            const scale = (idx <= 0) ? 1.0 : (idx === 1 ? 0.95 : 0.90);
+            this.vy = -this.jumpForce * scale;
+            this.onGround = false;
+            this.stretchTimer = 8;
+            this._sb99JumpCount++;
+            try { audio?.playSfx?.('jump'); } catch (_) {}
+          }
+        }
+      }
+
+      this._sb99JumpWasDown = jumpDown;
+      this._sb99DashWasDown = dashDown;
+      this._sb99SkillWasDown = skillDown;
 
       // limites mundo
       const worldWidth = level.worldWidth || 800;
@@ -327,6 +487,20 @@ window.SuperBario99 = window.SuperBario99 || {};
         this.stretchTimer = 8;
         if (audio) audio.playSfx('jump');
       }
+    }
+
+    // Nado: stroke curto (usado quando o GameV2 detecta que está na água)
+    swimStroke(strength, audio) {
+      const s = Number(strength);
+      if (!Number.isFinite(s) || s <= 0) return;
+      if (this._sb99SwimCooldown > 0) return;
+
+      // stroke: impulsão para cima + corta queda
+      this.vy = -Math.min(16, Math.max(2, s));
+      this.onGround = false;
+      this.stretchTimer = 6;
+      this._sb99SwimCooldown = 10;
+      try { audio?.playSfx?.('jump'); } catch (_) {}
     }
 
     attack(audio) {
@@ -358,7 +532,10 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (blink) return;
 
       const now = performance.now();
-      const invisible = !!(powerups && powerups.isPlayerInvisible && powerups.isPlayerInvisible(now));
+      const invisible = !!(
+        (powerups && powerups.isPlayerInvisible && powerups.isPlayerInvisible(now)) ||
+        (this._sb99ClassInvisUntil && now < this._sb99ClassInvisUntil)
+      );
       const electric = !!(powerups && powerups.isActive && powerups.isActive('electric', now));
 
       const x = this.x - cameraX;
@@ -417,12 +594,14 @@ window.SuperBario99 = window.SuperBario99 || {};
       }
       const trimBottom = (visibleBottom >= 0) ? (frame.length - 1 - visibleBottom) : 0;
       const drawY0 = y + (this.height - spriteH * scale) + (trimBottom * scale);
-      const palette = {
-        R: '#d12b2b',
-        B: '#2b63d1',
-        K: '#1b1b1b',
-        W: '#f5f6fa'
-      };
+      const palId = String(this._sb99Cosmetics?.palette || 'default');
+      const palette = (palId === 'ocean')
+        ? { R: '#00bcd4', B: '#2b63d1', K: '#0d1b2a', W: '#f5f6fa' }
+        : (palId === 'neon')
+          ? { R: '#ff00ff', B: '#00ffff', K: '#0a0a0a', W: '#f5f6fa' }
+          : (palId === 'retro')
+            ? { R: '#c44536', B: '#2d6a4f', K: '#1b1b1b', W: '#f6f1d1' }
+            : { R: '#d12b2b', B: '#2b63d1', K: '#1b1b1b', W: '#f5f6fa' };
 
       for (let row = 0; row < frame.length; row++) {
         const line = frame[row];
@@ -432,6 +611,27 @@ window.SuperBario99 = window.SuperBario99 || {};
           const drawCol = flip ? (line.length - 1 - col) : col;
           ctx.fillStyle = palette[ch];
           ctx.fillRect(drawX0 + drawCol * scale, drawY0 + row * scale, scale, scale);
+        }
+      }
+
+      // Acessório simples: chapéu
+      const hatType = String(this._sb99Cosmetics?.hat || 'none');
+      if (hatType !== 'none') {
+        if (hatType === 'cap') {
+          ctx.fillStyle = palette.K;
+          ctx.fillRect(x + 8, y + 2, 16, 4);
+          ctx.fillRect(x + 12, y, 8, 4);
+        } else if (hatType === 'beanie') {
+          ctx.fillStyle = palette.K;
+          ctx.fillRect(x + 9, y + 2, 14, 6);
+          ctx.fillRect(x + 11, y, 10, 2);
+        } else if (hatType === 'crown') {
+          ctx.fillStyle = palette.B;
+          ctx.fillRect(x + 9, y + 3, 14, 3);
+          ctx.fillStyle = palette.R;
+          ctx.fillRect(x + 10, y + 1, 3, 2);
+          ctx.fillRect(x + 14, y + 0, 3, 3);
+          ctx.fillRect(x + 18, y + 1, 3, 2);
         }
       }
 

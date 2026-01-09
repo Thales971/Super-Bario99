@@ -12,17 +12,30 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.canvas = document.getElementById('game-canvas');
       this.ctx = this.canvas.getContext('2d');
 
+      // Render: mantém coordenadas lógicas (gameplay) e escala para caber na tela.
+      // Isso permite DPR/retina sem quebrar física/câmera (que dependem de 800x450).
+      this._logicalW = Number(this.canvas?.getAttribute?.('width')) || 800;
+      this._logicalH = Number(this.canvas?.getAttribute?.('height')) || 450;
+      this._dpr = 1;
+      this._scaleX = 1;
+      this._scaleY = 1;
+
       this.menu = document.getElementById('menu');
       this.instructions = document.getElementById('instructions');
+      this.settings = document.getElementById('settings');
       this.endScreen = document.getElementById('end-screen');
 
       this.continueBtn = document.getElementById('continue-btn');
       this.startBtn = document.getElementById('start-btn');
       this.freeModeBtn = document.getElementById('free-mode-btn');
+      this.settingsBtn = document.getElementById('settings-btn');
       this.instructionsBtn = document.getElementById('instructions-btn');
       this.backBtn = document.getElementById('back-btn');
+      this.settingsBackBtn = document.getElementById('settings-back-btn');
       this.restartBtn = document.getElementById('restart-btn');
       this.menuBtn = document.getElementById('menu-btn');
+
+      this.dailyChallengeEl = document.getElementById('daily-challenge');
 
       this.muteBtn = document.getElementById('mute-btn');
       this.scoreDisplay = document.getElementById('score-display');
@@ -84,6 +97,17 @@ window.SuperBario99 = window.SuperBario99 || {};
       this._gamepadEnabled = true;
       this._gamepadState = { left: false, right: false, jump: false, attack: false };
 
+      // Opções / preferências
+      this._settingsKey = 'sb99_settings_v1';
+      this.settingsState = this._loadSettings();
+      this._reduceFlashes = !!this.settingsState.reduceFlashes;
+      this._lowPower = !!this.settingsState.lowPower;
+      this._gamepadEnabled = this.settingsState.gamepad !== false;
+
+      try {
+        document.body?.classList?.toggle('sb99-reduce-flashes', !!this._reduceFlashes);
+      } catch (_) {}
+
       this.highKey = 'superbario99_highscore_v2';
       this.saveKey = 'superbario99_save_v2';
       this.bestScore = Number(localStorage.getItem(this.highKey) || 0);
@@ -101,9 +125,15 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.projectiles = [];
       this._lastTapAt = 0;
 
+      // Fases secretas / especiais
+      this._secretPhaseManager = SuperBario99.SecretPhaseManager ? new SuperBario99.SecretPhaseManager() : null;
+
       // Feedback visual leve
       this._floatTexts = [];
       this._footprints = [];
+
+      // Habilidade avançada: slow time (T) com cargas por fase
+      this._sb99TimeSkill = { levelIndex: -1, charges: 0, until: 0, cdUntil: 0 };
 
       // Popup de comandos no início de cada fase
       this._phaseIntroUntil = 0;
@@ -122,8 +152,207 @@ window.SuperBario99 = window.SuperBario99 || {};
       this._gridCacheLevelIndex = -1;
       this._grid = null;
 
+      this._configureCanvas();
+
       this._bindEvents();
       this._checkSave();
+    }
+
+    _applyPlayerOptions() {
+      if (!this.player || typeof this.player.configure !== 'function') return;
+      try {
+        this.player.configure({
+          playerClass: this.settingsState?.playerClass,
+          palette: this.settingsState?.palette,
+          hat: this.settingsState?.hat
+        });
+      } catch (_) {}
+    }
+
+    _updateTempPlatforms(level, now) {
+      if (!level || !Array.isArray(level.platforms)) return;
+      const t = (typeof now === 'number') ? now : performance.now();
+      const list = level._sb99TempPlatforms;
+      if (!Array.isArray(list) || !list.length) return;
+
+      for (let i = list.length - 1; i >= 0; i--) {
+        const p = list[i];
+        if (!p) {
+          list.splice(i, 1);
+          continue;
+        }
+        if (p.expiresAt && t >= p.expiresAt) {
+          const idx = level.platforms.indexOf(p);
+          if (idx >= 0) level.platforms.splice(idx, 1);
+          list.splice(i, 1);
+        }
+      }
+    }
+
+    _handleClassSkill(level, now, justC) {
+      if (!justC || !this.player || !level) return;
+      const cls = String(this.settingsState?.playerClass || 'bario');
+      const t = (typeof now === 'number') ? now : performance.now();
+
+      if (cls === 'engineer') {
+        // Repara a plataforma quebrada mais próxima
+        const px = this.player.x + this.player.width / 2;
+        const py = this.player.y + this.player.height / 2;
+        let best = null;
+        let bestD2 = Infinity;
+        for (const p of (level.platforms || [])) {
+          if (!p || !p.sb99Broken) continue;
+          const cx = p.x + p.width / 2;
+          const cy = p.y + p.height / 2;
+          const dx = cx - px;
+          const dy = cy - py;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestD2) {
+            bestD2 = d2;
+            best = p;
+          }
+        }
+
+        if (best && bestD2 <= (160 * 160)) {
+          best.sb99Broken = false;
+          best.sb99Solid = true;
+          try { this.audio?.playSfx?.('ding'); } catch (_) {}
+          try { this._floatTexts?.push?.({ x: best.x + best.width / 2, y: best.y - 10, text: 'CONSERTOU!', until: t + 800 }); } catch (_) {}
+        } else {
+          try { this._floatTexts?.push?.({ x: this.player.x + this.player.width / 2, y: this.player.y - 10, text: 'Nada para consertar', until: t + 700 }); } catch (_) {}
+        }
+      } else if (cls === 'mage') {
+        // Cria plataforma temporária sob o player
+        if (!Array.isArray(level._sb99TempPlatforms)) level._sb99TempPlatforms = [];
+        if (level._sb99TempPlatforms.length >= 2) return;
+
+        const w = 92;
+        const h = 14;
+        const x = Math.floor((this.player.x + this.player.width / 2) - w / 2);
+        const y = Math.floor(this.player.y + this.player.height + 10);
+
+        const plat = {
+          x,
+          y,
+          width: w,
+          height: h,
+          sb99Solid: true,
+          sb99Temp: true,
+          expiresAt: t + 5200,
+          draw: function (ctx, cameraX) {
+            const px = this.x - (cameraX || 0);
+            ctx.save();
+            ctx.fillStyle = 'rgba(180,120,255,0.55)';
+            ctx.fillRect(px, this.y, this.width, this.height);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(px + 1, this.y + 1, this.width - 2, this.height - 2);
+            ctx.restore();
+          }
+        };
+        level.platforms.push(plat);
+        level._sb99TempPlatforms.push(plat);
+        try { this.audio?.playSfx?.('time'); } catch (_) {}
+      }
+    }
+
+    _defaultSettings() {
+      return {
+        playerClass: 'bario',
+        palette: 'default',
+        hat: 'none',
+        lowPower: false,
+        reduceFlashes: false,
+        gamepad: true
+      };
+    }
+
+    _loadSettings() {
+      const base = this._defaultSettings();
+      try {
+        const raw = localStorage.getItem(this._settingsKey);
+        if (!raw) return base;
+        const obj = JSON.parse(raw);
+        if (!obj || typeof obj !== 'object') return base;
+        const merged = { ...base, ...obj };
+        // compat: versões antigas salvavam boolean
+        if (typeof merged.hat === 'boolean') merged.hat = merged.hat ? 'cap' : 'none';
+        if (typeof merged.hat !== 'string') merged.hat = 'none';
+        return merged;
+      } catch (_) {
+        return base;
+      }
+    }
+
+    _saveSettings(next) {
+      try {
+        localStorage.setItem(this._settingsKey, JSON.stringify(next));
+      } catch (_) {}
+    }
+
+    _applySettingsToUi() {
+      const s = this.settingsState || this._defaultSettings();
+      const cls = document.getElementById('opt-class');
+      const pal = document.getElementById('opt-palette');
+      const hat = document.getElementById('opt-hat');
+      const lp = document.getElementById('opt-lowpower');
+      const rf = document.getElementById('opt-reduceflashes');
+      const gp = document.getElementById('opt-gamepad');
+      if (cls) cls.value = s.playerClass || 'bario';
+      if (pal) pal.value = s.palette || 'default';
+      if (hat) hat.value = String(s.hat || 'none');
+      if (lp) lp.checked = !!s.lowPower;
+      if (rf) rf.checked = !!s.reduceFlashes;
+      if (gp) gp.checked = s.gamepad !== false;
+    }
+
+    _readSettingsFromUi() {
+      const cls = document.getElementById('opt-class');
+      const pal = document.getElementById('opt-palette');
+      const hat = document.getElementById('opt-hat');
+      const lp = document.getElementById('opt-lowpower');
+      const rf = document.getElementById('opt-reduceflashes');
+      const gp = document.getElementById('opt-gamepad');
+      return {
+        ...this._defaultSettings(),
+        ...(this.settingsState || {}),
+        playerClass: cls ? String(cls.value || 'bario') : (this.settingsState?.playerClass || 'bario'),
+        palette: pal ? String(pal.value || 'default') : (this.settingsState?.palette || 'default'),
+        hat: hat ? String(hat.value || 'none') : String(this.settingsState?.hat || 'none'),
+        lowPower: lp ? !!lp.checked : !!this.settingsState?.lowPower,
+        reduceFlashes: rf ? !!rf.checked : !!this.settingsState?.reduceFlashes,
+        gamepad: gp ? !!gp.checked : (this.settingsState?.gamepad !== false)
+      };
+    }
+
+    _configureCanvas() {
+      if (!this.canvas || !this.ctx) return;
+
+      const rect = this.canvas.getBoundingClientRect ? this.canvas.getBoundingClientRect() : null;
+      const cssW = Math.max(1, rect ? rect.width : (this.canvas.clientWidth || this._logicalW));
+      const cssH = Math.max(1, rect ? rect.height : (this.canvas.clientHeight || this._logicalH));
+
+      const rawDpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+      // cap para evitar buffers gigantes (especialmente em mobile)
+      const cap = this._lowPower ? 1.25 : 2;
+      const dpr = Math.max(1, Math.min(cap, rawDpr));
+
+      const pxW = Math.max(1, Math.floor(cssW * dpr));
+      const pxH = Math.max(1, Math.floor(cssH * dpr));
+
+      // Expõe dimensões lógicas para outros sistemas (weather/theme overlay)
+      this.canvas._sb99LogicalWidth = this._logicalW;
+      this.canvas._sb99LogicalHeight = this._logicalH;
+
+      if (this.canvas.width !== pxW) this.canvas.width = pxW;
+      if (this.canvas.height !== pxH) this.canvas.height = pxH;
+
+      this._dpr = dpr;
+      this._scaleX = cssW / this._logicalW;
+      this._scaleY = cssH / this._logicalH;
+
+      // Desenha em coordenadas lógicas, escaladas para o tamanho real do canvas.
+      this.ctx.setTransform(dpr * this._scaleX, 0, 0, dpr * this._scaleY, 0, 0);
     }
 
     _queuePhaseIntro() {
@@ -133,9 +362,9 @@ window.SuperBario99 = window.SuperBario99 || {};
     }
 
     _getPlayerSpawnPoint(level, spawnX = 60, playerW = 32, playerH = 52) {
-      const ww = Number(level?.worldWidth || this.canvas?.width || 800);
+      const ww = Number(level?.worldWidth || this._logicalW || 800);
       const floorMargin = 20;
-      const floorY = (this.canvas ? this.canvas.height : 450) - playerH - floorMargin;
+      const floorY = (this._logicalH || 450) - playerH - floorMargin;
 
       const x = util.clamp(Number(spawnX) || 60, 0, Math.max(0, ww - playerW));
 
@@ -509,8 +738,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (this._phaseIntroLevelIndex !== this.levelIndex) return;
 
       const ctx = this.ctx;
-      const w = this.canvas.width;
-      const h = this.canvas.height;
+      const w = this._logicalW;
+      const h = this._logicalH;
 
       // Em telas muito baixas, não cobre o HUD todo
       const boxW = Math.min(460, w - 36);
@@ -569,22 +798,50 @@ window.SuperBario99 = window.SuperBario99 || {};
     _regenLevelForCurrentSeed() {
       if (!this.levels || !this.levels.length) return;
       this.levels[this.levelIndex] = SuperBario99.levelsV2.createLevel(this.levelIndex, this.levelSeed);
+      // Estado por-fase (evita “vazar” entre fases)
+      this._sb99OxygenState = null;
+      try { this._applySpecialPhaseForCurrentLevel(); } catch (_) {}
       try { this._sanitizeLevelGeometry(this.levels[this.levelIndex]); } catch (_) {}
       this._gridCacheLevelIndex = -1;
       this._rebuildEnvironmentForLevel();
     }
 
+    _applySpecialPhaseForCurrentLevel() {
+      const level = this._getLevel();
+      if (!level) return;
+
+      const phaseNumber = (this.levelIndex | 0) + 1;
+      try { this._secretPhaseManager?.unlockByProgress?.(phaseNumber); } catch (_) {}
+
+      // 1) Fase secreta aleatória: troca estética (sem quebrar a geração base)
+      try {
+        const secretTheme = this._secretPhaseManager?.getOrRollSecretTheme?.(phaseNumber);
+        if (secretTheme) {
+          level.aestheticId = secretTheme;
+          level.themeId = secretTheme;
+          level._sb99SecretTheme = secretTheme;
+        }
+      } catch (_) {}
+
+      // 2) Fase especial (por estética + número): aplica patch/hook
+      try {
+        const themeKey = String(level.aestheticId || level.themeId || '').toLowerCase();
+        const cfg = window.specialPhasesConfig?.loadSpecialPhase?.(themeKey, phaseNumber);
+        if (cfg) window.specialPhasesConfig?.applyToLevel?.(level, cfg);
+      } catch (_) {}
+    }
+
     _sanitizeLevelGeometry(level) {
       if (!level) return;
 
-      const h = this.canvas ? this.canvas.height : 450;
+      const h = this._logicalH || 450;
       const margin = 20;
       const maxY = Math.max(0, h - margin);
 
       // worldWidth mínimo
       try {
-        if (!Number.isFinite(level.worldWidth) || level.worldWidth < (this.canvas ? this.canvas.width : 800)) {
-          level.worldWidth = Math.max((this.canvas ? this.canvas.width : 800), Number(level.worldWidth) || 800);
+        if (!Number.isFinite(level.worldWidth) || level.worldWidth < (this._logicalW || 800)) {
+          level.worldWidth = Math.max((this._logicalW || 800), Number(level.worldWidth) || 800);
         }
       } catch (_) {}
 
@@ -650,6 +907,9 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       this._applyTouchVisibility();
 
+      // Sincroniza UI de opções (menu)
+      try { this._applySettingsToUi(); } catch (_) {}
+
       // Aplica estética do menu no boot
       if (SuperBario99.themes && SuperBario99.themes.applyThemeForLevel) {
         SuperBario99.themes.applyThemeForLevel(0);
@@ -662,7 +922,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
     _bindEvents() {
       window.addEventListener('keydown', (e) => {
-        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' ', 'x', 'X'].includes(e.key)) e.preventDefault();
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' ', 'x', 'X', 'Shift', 'z', 'Z', 'c', 'C', 't', 'T', 'p', 'P'].includes(e.key)) e.preventDefault();
         this.keys[e.key] = true;
       });
       window.addEventListener('keyup', (e) => {
@@ -684,7 +944,17 @@ window.SuperBario99 = window.SuperBario99 || {};
           try { await this.audio?.resumeAll?.(); } catch (_) {}
         }
       });
-      window.addEventListener('resize', () => this._applyTouchVisibility());
+      window.addEventListener('resize', () => {
+        this._applyTouchVisibility();
+        this._configureCanvas();
+      });
+      window.addEventListener('orientationchange', () => {
+        // alguns browsers disparam resize depois; ainda assim, força update imediato
+        this._applyTouchVisibility();
+        this._configureCanvas();
+        // evita “teclas presas” em rotações
+        this._releaseTouchKeys();
+      });
 
       this.continueBtn.addEventListener('click', () => this.loadGame());
       this.startBtn.addEventListener('click', () => this.start());
@@ -711,6 +981,49 @@ window.SuperBario99 = window.SuperBario99 || {};
         this.instructions.style.display = 'none';
         this.menu.style.display = 'flex';
       });
+
+      if (this.settingsBtn && this.settings) {
+        this.settingsBtn.addEventListener('click', () => {
+          this._applySettingsToUi();
+          this.settings.style.display = 'flex';
+          this.menu.style.display = 'none';
+        });
+      }
+      if (this.settingsBackBtn && this.settings) {
+        this.settingsBackBtn.addEventListener('click', () => {
+          this.settings.style.display = 'none';
+          this.menu.style.display = 'flex';
+        });
+      }
+
+      // Auto-save de opções
+      const bindOpt = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => {
+          this.settingsState = this._readSettingsFromUi();
+          this._saveSettings(this.settingsState);
+          this._reduceFlashes = !!this.settingsState.reduceFlashes;
+          this._lowPower = !!this.settingsState.lowPower;
+          this._gamepadEnabled = this.settingsState.gamepad !== false;
+
+          try {
+            document.body?.classList?.toggle('sb99-reduce-flashes', !!this._reduceFlashes);
+          } catch (_) {}
+
+          // Recalcula canvas quando muda low power
+          this._configureCanvas();
+
+          // Aplica imediatamente no player atual (classe/paleta/chapéu)
+          this._applyPlayerOptions();
+        });
+      };
+      bindOpt('opt-class');
+      bindOpt('opt-palette');
+      bindOpt('opt-hat');
+      bindOpt('opt-lowpower');
+      bindOpt('opt-reduceflashes');
+      bindOpt('opt-gamepad');
 
       this.muteBtn.addEventListener('click', async () => {
         this.audio.init();
@@ -803,6 +1116,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       localStorage.removeItem(this.saveKey);
       this._checkSave();
 
+      // Nova run: reseta decisões de fases secretas
+      try { this._secretPhaseManager?.resetRun?.(); } catch (_) {}
+
       this.audio.init();
       await this.audio.resume();
 
@@ -816,6 +1132,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         const level = this._getLevel();
         const sp = this._getPlayerSpawnPoint(level, 60, 32, 52);
         this.player = new SuperBario99.PlayerV2(sp.x, sp.y);
+        this._applyPlayerOptions();
         this._beginSpawnPortal(level, performance.now());
       }
       this._lastLives = this.player.lives;
@@ -871,6 +1188,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         const level = this._getLevel();
         const sp = this._getPlayerSpawnPoint(level, 60, 32, 52);
         this.player = new SuperBario99.PlayerV2(sp.x, sp.y);
+        this._applyPlayerOptions();
         this._beginSpawnPortal(level, performance.now());
       }
       this.player.score = 0;
@@ -940,6 +1258,7 @@ window.SuperBario99 = window.SuperBario99 || {};
           const level = this._getLevel();
           const sp = this._getPlayerSpawnPoint(level, 60, 32, 52);
           this.player = new SuperBario99.PlayerV2(sp.x, sp.y);
+          this._applyPlayerOptions();
           this._beginSpawnPortal(level, performance.now());
         }
         this.player.score = data.score || 0;
@@ -1037,7 +1356,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       const bossCfg = (SuperBario99.bossesV2 && SuperBario99.bossesV2.getBossForLevel) ? SuperBario99.bossesV2.getBossForLevel(levelIndex) : null;
 
       const configs = SuperBario99.loreV2.getNpcConfigsForLevel(levelIndex, aestheticId, level, bossCfg) || [];
-      const ww = Number(level.worldWidth || this.canvas.width || 800);
+      const ww = Number(level.worldWidth || this._logicalW || 800);
       const npcW = 32;
       const npcH = 52;
       const isBoss = !!bossCfg;
@@ -1138,7 +1457,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       };
 
       const pickGroundY = (x) => {
-        const h = this.canvas ? this.canvas.height : 450;
+        const h = this._logicalH || 450;
         let best = null;
         if (Array.isArray(level.platforms)) {
           for (const p of level.platforms) {
@@ -1204,7 +1523,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         const y = picked ? picked.y : pickGroundY(x);
         // se caiu no fallback, tenta ao menos evitar colisão direta com hazards/goal
         const safe = picked ? true : isRectSafe(x, y, npcW, npcH);
-        npcs.push(new SuperBario99.HumanNpcV2(x, safe ? y : util.clamp(y - 24, 60, (this.canvas ? this.canvas.height : 450) - 60), cfg));
+        npcs.push(new SuperBario99.HumanNpcV2(x, safe ? y : util.clamp(y - 24, 60, (this._logicalH || 450) - 60), cfg));
       }
       this.npcs = npcs;
     }
@@ -1234,6 +1553,78 @@ window.SuperBario99 = window.SuperBario99 || {};
       this._nearNpc = nearest;
     }
 
+    _getNpcSafeZones() {
+      const npcs = this.npcs;
+      if (!Array.isArray(npcs) || !npcs.length) return [];
+
+      // Área segura para evitar que inimigos “grudem” nos NPCs e atrapalhem interação.
+      // Mantém simples: retângulo expandido ao redor de cada NPC.
+      const padX = 150;
+      const padY = 90;
+
+      const zones = [];
+      for (const npc of npcs) {
+        if (!npc || !Number.isFinite(npc.x) || !Number.isFinite(npc.y)) continue;
+        const w = Number.isFinite(npc.width) ? npc.width : 32;
+        const h = Number.isFinite(npc.height) ? npc.height : 52;
+        zones.push({
+          x: npc.x - padX,
+          y: npc.y - padY,
+          w: w + padX * 2,
+          h: h + padY * 2,
+          cx: npc.x + w / 2,
+          npc
+        });
+      }
+      return zones;
+    }
+
+    _rectsOverlap(a, b) {
+      return (
+        a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y
+      );
+    }
+
+    _repelEnemyFromNpcZone(enemy, zone, level) {
+      if (!enemy || !zone) return;
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) return;
+      const ew = Number.isFinite(enemy.width) ? enemy.width : 28;
+      const eh = Number.isFinite(enemy.height) ? enemy.height : 28;
+
+      const margin = 10;
+      const ex = enemy.x + ew / 2;
+      const pushLeft = ex < (zone.cx || (zone.x + zone.w / 2));
+
+      if (pushLeft) {
+        enemy.x = zone.x - ew - margin;
+        if ('direction' in enemy) enemy.direction = -1;
+      } else {
+        enemy.x = zone.x + zone.w + margin;
+        if ('direction' in enemy) enemy.direction = 1;
+      }
+
+      // trava velocidade para não “entrar de novo” no mesmo frame
+      if ('vx' in enemy && Number.isFinite(enemy.vx)) enemy.vx = 0;
+      if ('vy' in enemy && Number.isFinite(enemy.vy)) enemy.vy = Math.min(0, enemy.vy);
+
+      // inimigos flutuantes usam baseX/baseY — atualiza para evitar drift de volta
+      if ('baseX' in enemy && Number.isFinite(enemy.baseX)) enemy.baseX = enemy.x;
+      if ('baseY' in enemy && Number.isFinite(enemy.baseY)) enemy.baseY = enemy.y;
+
+      // garante que não sai do mundo
+      try {
+        const ww = Number(level?.worldWidth) || 800;
+        enemy.x = util.clamp(enemy.x, 0, Math.max(0, ww - ew));
+      } catch (_) {}
+      try {
+        const hh = (this._logicalH || 450);
+        enemy.y = util.clamp(enemy.y, 0, Math.max(0, hh - eh));
+      } catch (_) {}
+    }
+
     _startDialogue(npc, nowMs) {
       if (!npc) return;
       this._dialogue = {
@@ -1260,8 +1651,8 @@ window.SuperBario99 = window.SuperBario99 || {};
     _drawDialogueHud(aestheticId) {
       if (!this._dialogue || !this._dialogue.active) return;
       const ctx = this.ctx;
-      const w = this.canvas.width;
-      const h = this.canvas.height;
+      const w = this._logicalW;
+      const h = this._logicalH;
 
       const boxW = Math.min(680, w - 30);
       const boxH = 112;
@@ -1387,12 +1778,69 @@ window.SuperBario99 = window.SuperBario99 || {};
         : (level && (level.aestheticId || (SuperBario99.themes ? SuperBario99.themes.getAestheticIdForLevel(this.levelIndex) : level.themeId))) || 'windows-xp';
 
       if (base === 'caos-final') return this._getChaosVariantAesthetic(nowMs);
+
+      // Estéticas secretas (offline/determinístico): raras e não aparecem no modo livre.
+      // Não aplica em boss (pra não bagunçar leitura) e nem durante menu/free-mode.
+      if (!this._isFreeMode && !this._isBossLevel(this.levelIndex)) {
+        const seed = (this.levelSeed >>> 0) || ((1000 + this.levelIndex * 999) >>> 0);
+        const roll = ((seed ^ (((this.levelIndex + 1) * 2654435761) >>> 0)) >>> 0) % 100;
+        if (roll === 0) return 'secret-void';
+        if (roll === 1) return 'secret-terminal';
+        if (roll === 2) return 'secret-amber';
+      }
       return base;
+    }
+
+    _tryUseTimeSlowSkill(nowMs) {
+      const t = (typeof nowMs === 'number') ? nowMs : performance.now();
+      if (!this._sb99TimeSkill) this._sb99TimeSkill = { levelIndex: -1, charges: 0, until: 0, cdUntil: 0 };
+
+      if (this._sb99TimeSkill.levelIndex !== this.levelIndex) {
+        this._sb99TimeSkill.levelIndex = this.levelIndex;
+        this._sb99TimeSkill.charges = 2;
+        this._sb99TimeSkill.until = 0;
+        this._sb99TimeSkill.cdUntil = 0;
+      }
+
+      if (t < (this._sb99TimeSkill.cdUntil || 0)) {
+        this._pushFloatText(this.player.x + 16, this.player.y - 10, 'Aguarde...', 'rgba(255,255,255,0.85)');
+        return false;
+      }
+      if ((this._sb99TimeSkill.charges | 0) <= 0) {
+        this._pushFloatText(this.player.x + 16, this.player.y - 10, 'Sem cargas', 'rgba(255,255,255,0.85)');
+        return false;
+      }
+
+      this._sb99TimeSkill.charges--;
+      this._sb99TimeSkill.until = t + 4200;
+      this._sb99TimeSkill.cdUntil = t + 9000;
+
+      try { this.audio?.playSfx?.('time'); } catch (_) {}
+      this._pushFloatText(this.player.x + 16, this.player.y - 10, 'TEMPO LENTO!', 'rgba(255,255,255,0.92)');
+      return true;
+    }
+
+    _capturePhoto(nowMs) {
+      const t = (typeof nowMs === 'number') ? nowMs : performance.now();
+      try {
+        const a = document.createElement('a');
+        const lvl = (this.levelIndex | 0) + 1;
+        a.download = `SB99_foto_fase${lvl}_${Math.floor(t)}.png`;
+        a.href = this.canvas.toDataURL('image/png');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        this._pushFloatText(this.player.x + 16, this.player.y - 10, 'Foto salva!', 'rgba(255,255,255,0.92)');
+        return true;
+      } catch (_) {
+        this._pushFloatText(this.player.x + 16, this.player.y - 10, 'Falha ao salvar', 'rgba(255,255,255,0.85)');
+        return false;
+      }
     }
 
     _getGroundY(level) {
       // tenta pegar a plataforma mais "chão" (mais larga e mais baixa)
-      if (!level || !level.platforms || !level.platforms.length) return this.canvas.height - 60;
+      if (!level || !level.platforms || !level.platforms.length) return (this._logicalH || 450) - 60;
       let best = null;
       for (const p of level.platforms) {
         if (!best) { best = p; continue; }
@@ -1400,7 +1848,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         const bArea = (best.width || 0) * (best.height || 0);
         if ((p.y > best.y && pArea >= bArea * 0.75) || pArea > bArea * 1.35) best = p;
       }
-      return (best && typeof best.y === 'number') ? best.y : (this.canvas.height - 60);
+      return (best && typeof best.y === 'number') ? best.y : ((this._logicalH || 450) - 60);
     }
 
     _pushFloatText(x, y, text, color = 'rgba(255,255,255,0.9)') {
@@ -1413,8 +1861,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.sakura.length = 0;
       for (let i = 0; i < 45; i++) {
         this.sakura.push({
-          x: Math.random() * this.canvas.width,
-          y: Math.random() * this.canvas.height,
+          x: Math.random() * this._logicalW,
+          y: Math.random() * this._logicalH,
           vx: util.rand(-0.3, 0.6),
           vy: util.rand(0.5, 1.3),
           r: util.rand(2, 4),
@@ -1428,12 +1876,12 @@ window.SuperBario99 = window.SuperBario99 || {};
         s.x += s.vx;
         s.y += s.vy;
         s.rot += 0.02;
-        if (s.y > this.canvas.height + 10) {
+        if (s.y > this._logicalH + 10) {
           s.y = -10;
-          s.x = Math.random() * this.canvas.width;
+          s.x = Math.random() * this._logicalW;
         }
-        if (s.x < -10) s.x = this.canvas.width + 10;
-        if (s.x > this.canvas.width + 10) s.x = -10;
+        if (s.x < -10) s.x = this._logicalW + 10;
+        if (s.x > this._logicalW + 10) s.x = -10;
       }
     }
 
@@ -1487,6 +1935,144 @@ window.SuperBario99 = window.SuperBario99 || {};
       const level = this.levels[levelIndex];
       const diff = SuperBario99.difficulty.getDifficulty(levelIndex);
       const aestheticId = (level && (level.aestheticId || (SuperBario99.themes ? SuperBario99.themes.getAestheticIdForLevel(levelIndex) : null))) || level.themeId;
+
+      // Overrides do Modo Livre (precisa vir antes do factory)
+      const free = (this._isFreeMode && this._freeConfig) ? this._freeConfig : null;
+
+
+      // Boss no fim do bloco (precisa vir antes do factory, senão some)
+      if (this._isBossLevel(levelIndex)) {
+        const rng = (() => {
+          let seed = ((this.levelSeed >>> 0) ^ (777 + levelIndex * 1337)) >>> 0;
+          return () => {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 4294967296;
+          };
+        })();
+
+        const enemies = [];
+        const bx = Math.max(420, level.worldWidth - 520);
+        const by = 290;
+        const bossCfg = (SuperBario99.bossesV2 && SuperBario99.bossesV2.getBossForLevel)
+          ? SuperBario99.bossesV2.getBossForLevel(levelIndex)
+          : null;
+        const bossVisualId = String(bossCfg?.musicId || aestheticId);
+        enemies.push(new SuperBario99.ThemeBoss(bx, by, bossVisualId, levelIndex, bossCfg));
+
+        const extra = diff.tier === 'advanced' ? 4 : 2;
+        for (let i = 0; i < extra; i++) {
+          const x = bx - 260 - i * 110;
+          const y = 260 + Math.floor(rng() * 70);
+          enemies.push(new SuperBario99.DroneEnemy(x, y));
+        }
+
+        return enemies;
+      }
+
+      // Inimigos explícitos de fases especiais (antes do factory).
+      // Regras:
+      // - não roda no Modo Livre (free-mode tem prioridade)
+      // - não interfere em boss (já retornou acima)
+      // - tenta instanciar apenas os tipos implementados; se ficar “vazio”, cai no spawn normal
+      if (!free) {
+        try {
+          const specs = Array.isArray(level?._sb99SpecialEnemies) ? level._sb99SpecialEnemies : null;
+          const factory = SuperBario99.themeEnemyFactory;
+          if (specs && specs.length && factory && typeof factory.createEnemy === 'function') {
+            const specialEnemies = [];
+            const specTypes = [];
+
+            for (const spec of specs) {
+              const type = String(spec?.type || '').toLowerCase();
+              const x = Number(spec?.x);
+              const y = Number(spec?.y);
+              if (!type || !isFinite(x) || !isFinite(y)) continue;
+
+              specTypes.push(type);
+              const e = factory.createEnemy(type, x, y);
+              if (!e) continue;
+
+              // guarda config (pra inimigos novos poderem ler behavior/floatRange etc.)
+              try { e._sb99SpecialSpec = spec; } catch (_) {}
+              specialEnemies.push(e);
+            }
+
+            // Se pelo menos 1 inimigo especial foi instanciado, usa-os como base.
+            // Completa com o pool temático para não deixar a fase vazia
+            // (muitos tipos do documento ainda podem não existir como classes).
+            if (specialEnemies.length) {
+              const phaseNumber = (levelIndex | 0) + 1;
+
+              // rng determinístico compatível com o resto do game
+              const rng = (() => {
+                let seed = ((this.levelSeed >>> 0) ^ (777 + levelIndex * 1337)) >>> 0;
+                return () => {
+                  seed = (seed * 1664525 + 1013904223) >>> 0;
+                  return seed / 4294967296;
+                };
+              })();
+
+              let requireSignature = true;
+              try {
+                const norm = (typeof factory.normalizeThemeId === 'function')
+                  ? factory.normalizeThemeId(String(aestheticId || level?.themeId || 'japan-retro'))
+                  : String(aestheticId || level?.themeId || 'japan-retro');
+                const sig = factory.signatureByTheme ? String(factory.signatureByTheme[norm] || '') : '';
+                if (sig && specTypes.includes(sig.toLowerCase())) requireSignature = false;
+              } catch (_) {}
+
+              // Mantém densidade próxima ao padrão do factory
+              const baseEnemyCount = Math.min(15, 5 + Math.floor(phaseNumber / 10));
+              const desiredTotal = Math.max(
+                specialEnemies.length,
+                (requireSignature ? 1 : 0) + baseEnemyCount
+              );
+
+              const remainingTotal = desiredTotal - specialEnemies.length;
+              if (remainingTotal > 0 && typeof factory.spawnThemedEnemies === 'function') {
+                const fillEnemyCount = Math.max(0, remainingTotal - (requireSignature ? 1 : 0));
+                const fill = factory.spawnThemedEnemies(String(aestheticId || level?.themeId || 'japan-retro'), phaseNumber, {
+                  worldWidth: level?.worldWidth,
+                  level,
+                  rng,
+                  enemyCount: fillEnemyCount,
+                  requireSignature
+                });
+                if (Array.isArray(fill) && fill.length) specialEnemies.push(...fill);
+              }
+
+              return specialEnemies;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Factory novo (pools por estética): por padrão, sempre usa nos modos normais.
+      // No Modo Livre, respeita o usuário (pool/contagem/behavior) e não substitui.
+      if (!free) {
+        try {
+          const phaseNumber = (levelIndex | 0) + 1;
+          const factory = SuperBario99.themeEnemyFactory;
+          if (factory && typeof factory.spawnThemedEnemies === 'function') {
+            const enemies = factory.spawnThemedEnemies(String(aestheticId || level?.themeId || 'japan-retro'), phaseNumber, {
+              worldWidth: level?.worldWidth,
+              level,
+              // Usa um rng determinístico compatível com o resto do game
+              rng: (() => {
+                let seed = ((this.levelSeed >>> 0) ^ (777 + levelIndex * 1337)) >>> 0;
+                return () => {
+                  seed = (seed * 1664525 + 1013904223) >>> 0;
+                  return seed / 4294967296;
+                };
+              })(),
+              // deixa o factory decidir pela progressão
+              enemyCount: null,
+              requireSignature: true
+            });
+            if (Array.isArray(enemies) && enemies.length) return enemies;
+          }
+        } catch (_) {}
+      }
       const themeId = (() => {
         const a = String(aestheticId || level.themeId || 'japan');
         if (a === 'japan-retro') return 'japan';
@@ -1507,32 +2093,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       })();
 
       const enemies = [];
-
-      // Overrides do Modo Livre
-      const free = (this._isFreeMode && this._freeConfig) ? this._freeConfig : null;
       const desiredCount = free ? util.clamp((free.enemyCount | 0), 0, 50) : null;
       const poolId = free ? String(free.enemyPool || 'mixed') : null;
       const behavior = free ? String(free.enemyBehavior || 'random') : 'random';
-
-      // Boss no fim do bloco
-      if (this._isBossLevel(levelIndex)) {
-        const bx = Math.max(420, level.worldWidth - 520);
-        const by = 290;
-        const bossCfg = (SuperBario99.bossesV2 && SuperBario99.bossesV2.getBossForLevel)
-          ? SuperBario99.bossesV2.getBossForLevel(levelIndex)
-          : null;
-        const bossVisualId = String(bossCfg?.musicId || aestheticId || themeId);
-        enemies.push(new SuperBario99.ThemeBoss(bx, by, bossVisualId, levelIndex, bossCfg));
-
-        const extra = diff.tier === 'advanced' ? 4 : 2;
-        for (let i = 0; i < extra; i++) {
-          const x = bx - 260 - i * 110;
-          const y = 260 + Math.floor(rng() * 70);
-          enemies.push(new SuperBario99.DroneEnemy(x, y));
-        }
-
-        return enemies;
-      }
 
       // Random real por estética (pesos por tema)
       const tables = {
@@ -1685,14 +2248,20 @@ window.SuperBario99 = window.SuperBario99 || {};
     _ensureGridForLevel(levelIndex) {
       if (this._gridCacheLevelIndex === levelIndex && this._grid) return;
       const level = this.levels[levelIndex];
-      this._grid = SuperBario99.pathfinding.buildSolidGrid(level, 32, this.canvas.height);
+      this._grid = SuperBario99.pathfinding.buildSolidGrid(level, 32, (this._logicalH || 450));
       this._gridCacheLevelIndex = levelIndex;
     }
 
     _updateHud() {
       this.scoreDisplay.textContent = `Pontos: ${this.player ? this.player.score : 0}`;
       const total = (this.levels && this.levels.length) ? this.levels.length : 50;
-      this.levelDisplay.textContent = `Fase: ${this.levelIndex + 1}/${total}`;
+      const o2 = this._sb99OxygenState;
+      if (o2 && o2.active && Number.isFinite(o2.max) && o2.max > 0) {
+        const pct = Math.max(0, Math.min(100, Math.round((o2.value / o2.max) * 100)));
+        this.levelDisplay.textContent = `Fase: ${this.levelIndex + 1}/${total}  •  O2: ${pct}%`;
+      } else {
+        this.levelDisplay.textContent = `Fase: ${this.levelIndex + 1}/${total}`;
+      }
       this.bestDisplay.textContent = `Recorde: ${this.bestScore}`;
       if (!this.powerupDisplay) return;
       const now = performance.now();
@@ -1756,12 +2325,15 @@ window.SuperBario99 = window.SuperBario99 || {};
     }
 
     _cameraUpdate(level) {
-      const target = this.player.x - this.canvas.width * 0.45;
-      this.cameraX = util.clamp(target, 0, Math.max(0, level.worldWidth - this.canvas.width));
+      const target = this.player.x - this._logicalW * 0.45;
+      this.cameraX = util.clamp(target, 0, Math.max(0, level.worldWidth - this._logicalW));
     }
 
     _renderBackground(themeId, nightMode) {
       const ctx = this.ctx;
+
+      const w = this._logicalW;
+      const h = this._logicalH;
 
       // Dia/noite
       const darken = nightMode ? 0.55 : 0.0;
@@ -1789,11 +2361,11 @@ window.SuperBario99 = window.SuperBario99 || {};
       // JAPÃO RETRO (fases 1-10)
       // -----------------------------
       if (isJapanRetro) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, this._logicalH);
         grd.addColorStop(0, '#ffb6d5');
         grd.addColorStop(1, '#ffeef6');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, this._logicalW, this._logicalH);
 
         // Fuji
         const par = -(this.cameraX * 0.15) % 900;
@@ -1815,7 +2387,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // Torii
         ctx.fillStyle = 'rgba(192, 57, 43, 0.40)';
         for (let i = 0; i < 4; i++) {
-          const x = (par + i * 240 + 60) % (this.canvas.width + 100);
+          const x = (par + i * 240 + 60) % (this._logicalW + 100);
           ctx.fillRect(x, 320, 6, 60);
           ctx.fillRect(x + 26, 320, 6, 60);
           ctx.fillRect(x - 8, 315, 48, 8);
@@ -1830,14 +2402,14 @@ window.SuperBario99 = window.SuperBario99 || {};
       // -----------------------------
       else if (isXP) {
         // céu
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#65B9FF');
         grd.addColorStop(1, '#0055E5');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // colinas "Bliss" (estilizado)
-        const par = -(this.cameraX * 0.18) % (this.canvas.width + 400);
+        const par = -(this.cameraX * 0.18) % (w + 400);
         ctx.fillStyle = '#2ecc71';
         ctx.beginPath();
         ctx.moveTo(par - 200, 420);
@@ -1853,9 +2425,9 @@ window.SuperBario99 = window.SuperBario99 || {};
 
         // "barra de tarefas" no topo
         ctx.fillStyle = 'rgba(236,233,216,0.92)';
-        ctx.fillRect(0, 0, this.canvas.width, 28);
+        ctx.fillRect(0, 0, w, 28);
         ctx.fillStyle = 'rgba(0,85,229,0.55)';
-        ctx.fillRect(0, 26, this.canvas.width, 2);
+        ctx.fillRect(0, 26, w, 2);
         ctx.fillStyle = 'rgba(0,204,0,0.85)';
         ctx.fillRect(8, 6, 62, 18);
         ctx.fillStyle = 'rgba(255,255,255,0.80)';
@@ -1875,11 +2447,11 @@ window.SuperBario99 = window.SuperBario99 || {};
       // FRUITIGER AERO (fases 6-10)
       // -----------------------------
       else if (isFruitiger) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#87CEEB');
         grd.addColorStop(1, '#1E90FF');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // nuvens fofas ("blur" simulado com camadas)
         const base = -(this.cameraX * 0.22) % 900;
@@ -1914,16 +2486,16 @@ window.SuperBario99 = window.SuperBario99 || {};
         // grade sutil no chão
         ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
-        for (let gx = 0; gx < this.canvas.width; gx += 24) {
+        for (let gx = 0; gx < w; gx += 24) {
           ctx.beginPath();
           ctx.moveTo(gx, 380);
-          ctx.lineTo(gx, this.canvas.height);
+          ctx.lineTo(gx, h);
           ctx.stroke();
         }
-        for (let gy = 380; gy < this.canvas.height; gy += 18) {
+        for (let gy = 380; gy < h; gy += 18) {
           ctx.beginPath();
           ctx.moveTo(0, gy);
-          ctx.lineTo(this.canvas.width, gy);
+          ctx.lineTo(w, gy);
           ctx.stroke();
         }
 
@@ -1931,32 +2503,32 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         const t = performance.now() * 0.001;
         for (let i = 0; i < 34; i++) {
-          const px = ((i * 67) + (this.cameraX * 0.12) + (t * 60)) % (this.canvas.width + 40) - 20;
+          const px = ((i * 67) + (this.cameraX * 0.12) + (t * 60)) % (w + 40) - 20;
           const py = 120 + ((i * 29) % 240);
           ctx.fillRect(px, py, 2, 2);
         }
 
         // luz suave global
         ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
       }
 
       // -----------------------------
       // FRUITIGER OCEAN (50-59)
       // -----------------------------
       else if (isOcean) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#00CED1');
         grd.addColorStop(1, '#1E90FF');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // ondas na base
         ctx.fillStyle = 'rgba(255,255,255,0.10)';
         const t = performance.now() * 0.001;
         for (let i = 0; i < 4; i++) {
           const wave = 4 + i * 2;
-          ctx.fillRect(0, 386 + Math.sin(t * 1.4 + i) * wave, this.canvas.width, 10);
+          ctx.fillRect(0, 386 + Math.sin(t * 1.4 + i) * wave, w, 10);
         }
       }
 
@@ -1964,12 +2536,12 @@ window.SuperBario99 = window.SuperBario99 || {};
       // FRUITIGER SUNSET (60-69)
       // -----------------------------
       else if (isSunset) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#FF6347');
         grd.addColorStop(0.55, '#FFA500');
         grd.addColorStop(1, '#FFD700');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // sol
         ctx.fillStyle = 'rgba(255,215,0,0.35)';
@@ -1983,11 +2555,11 @@ window.SuperBario99 = window.SuperBario99 || {};
       // -----------------------------
       else if (isNeon) {
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
         // círculos concêntricos
         ctx.strokeStyle = 'rgba(0,255,255,0.18)';
         ctx.lineWidth = 2;
-        const cx = this.canvas.width * 0.55;
+        const cx = w * 0.55;
         const cy = 160;
         for (let r = 40; r <= 180; r += 20) {
           ctx.beginPath();
@@ -2000,11 +2572,11 @@ window.SuperBario99 = window.SuperBario99 || {};
       // FRUITIGER FOREST (80-89)
       // -----------------------------
       else if (isForest) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#228B22');
         grd.addColorStop(1, '#145a22');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // árvores altas
         const base = -(this.cameraX * 0.16) % 900;
@@ -2023,16 +2595,16 @@ window.SuperBario99 = window.SuperBario99 || {};
       // FRUITIGER GALAXY (90-99)
       // -----------------------------
       else if (isGalaxy) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#0b0014');
         grd.addColorStop(1, '#00008B');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // estrelas
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         for (let i = 0; i < 70; i++) {
-          const sx = (i * 37 + (this.cameraX * 0.05)) % this.canvas.width;
+          const sx = (i * 37 + (this.cameraX * 0.05)) % w;
           const sy = (i * 19) % 240;
           const s = (i % 3) + 1;
           ctx.fillRect(sx, sy, s, s);
@@ -2045,7 +2617,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       else if (isChaos) {
         // base neutra; o overlay e o fluxo do Game alternam estéticas
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
       }
 
       // -----------------------------
@@ -2054,23 +2626,23 @@ window.SuperBario99 = window.SuperBario99 || {};
       else if (isTecno) {
         // base escura
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // gradiente tecnológico
-        const grd = ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, w, h);
         grd.addColorStop(0, 'rgba(138,43,226,0.38)');
         grd.addColorStop(1, 'rgba(0,191,255,0.30)');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // circuitos
         ctx.strokeStyle = 'rgba(0,255,255,0.55)';
         ctx.lineWidth = 2;
         for (let i = 0; i < 10; i++) {
-          const x = ((i * 120) + (this.cameraX * 0.25)) % this.canvas.width;
+          const x = ((i * 120) + (this.cameraX * 0.25)) % w;
           ctx.beginPath();
           ctx.moveTo(x, 0);
-          ctx.lineTo(x, this.canvas.height);
+          ctx.lineTo(x, h);
           ctx.stroke();
         }
         ctx.strokeStyle = 'rgba(57,255,20,0.28)';
@@ -2078,7 +2650,7 @@ window.SuperBario99 = window.SuperBario99 || {};
           const y = 40 + i * 68;
           ctx.beginPath();
           ctx.moveTo(0, y);
-          ctx.lineTo(this.canvas.width, y);
+          ctx.lineTo(w, y);
           ctx.stroke();
         }
 
@@ -2095,7 +2667,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // mandala digital (círculos)
         ctx.strokeStyle = 'rgba(0,255,255,0.25)';
         ctx.lineWidth = 2;
-        const cx = this.canvas.width * 0.72;
+        const cx = w * 0.72;
         const cy = 150;
         for (let r = 40; r <= 120; r += 20) {
           ctx.beginPath();
@@ -2107,7 +2679,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.strokeStyle = 'rgba(0,255,255,0.20)';
         ctx.fillStyle = 'rgba(0,255,255,0.35)';
         for (let i = 0; i < 10; i++) {
-          const px = ((this.cameraX * 0.18) + i * 90) % (this.canvas.width + 120) - 60;
+          const px = ((this.cameraX * 0.18) + i * 90) % (w + 120) - 60;
           const py = 90 + (i % 5) * 44;
           ctx.beginPath();
           ctx.arc(px, py, 2, 0, Math.PI * 2);
@@ -2120,18 +2692,18 @@ window.SuperBario99 = window.SuperBario99 || {};
 
         // overlay preto 90% opacidade ("fundo" profundo)
         ctx.fillStyle = 'rgba(0,0,0,0.38)';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
       }
 
       // -----------------------------
       // DORFIC (fases 16-20)
       // -----------------------------
       else if (isDorfic) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#556B2F');
         grd.addColorStop(1, '#228B22');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // árvores antigas (casca)
         const base = -(this.cameraX * 0.18) % 900;
@@ -2150,7 +2722,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // rochas com musgo
         ctx.fillStyle = 'rgba(105,105,105,0.55)';
         for (let i = 0; i < 7; i++) {
-          const rx = ((this.cameraX * 0.10) + i * 140) % (this.canvas.width + 200) - 80;
+          const rx = ((this.cameraX * 0.10) + i * 140) % (w + 200) - 80;
           ctx.beginPath();
           ctx.arc(rx, 380, 30 + (i % 3) * 10, 0, Math.PI * 2);
           ctx.fill();
@@ -2174,11 +2746,11 @@ window.SuperBario99 = window.SuperBario99 || {};
         }
 
         // neblina baixa
-        const fog = ctx.createLinearGradient(0, 310, 0, this.canvas.height);
+        const fog = ctx.createLinearGradient(0, 310, 0, h);
         fog.addColorStop(0, 'rgba(255,255,255,0.00)');
         fog.addColorStop(1, 'rgba(255,255,255,0.12)');
         ctx.fillStyle = fog;
-        ctx.fillRect(0, 310, this.canvas.width, this.canvas.height - 310);
+        ctx.fillRect(0, 310, w, h - 310);
       }
 
       // -----------------------------
@@ -2187,12 +2759,12 @@ window.SuperBario99 = window.SuperBario99 || {};
       else if (isMetro) {
         // fundo profundo
         ctx.fillStyle = '#0A0A0A';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, 'rgba(0,102,204,0.40)');
         grd.addColorStop(1, 'rgba(0,191,255,0.22)');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // trilhos com perspectiva
         ctx.strokeStyle = 'rgba(192,192,192,0.60)';
@@ -2208,11 +2780,11 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.strokeStyle = 'rgba(0,191,255,0.60)';
         ctx.beginPath();
         ctx.moveTo(0, 330);
-        ctx.lineTo(this.canvas.width, 330);
+        ctx.lineTo(w, 330);
         ctx.stroke();
 
         // trem passando (sprites simples)
-        const tx = ((-this.cameraX * 0.70) % (this.canvas.width + 320)) + this.canvas.width;
+        const tx = ((-this.cameraX * 0.70) % (w + 320)) + w;
         ctx.fillStyle = 'rgba(192,192,192,0.28)';
         ctx.fillRect(tx - 320, 248, 260, 40);
         ctx.fillStyle = 'rgba(0,191,255,0.35)';
@@ -2258,8 +2830,8 @@ window.SuperBario99 = window.SuperBario99 || {};
           ctx.lineTo(40, y + 18);
           ctx.stroke();
           ctx.beginPath();
-          ctx.moveTo(this.canvas.width, y);
-          ctx.lineTo(this.canvas.width - 40, y + 18);
+          ctx.moveTo(w, y);
+          ctx.lineTo(w - 40, y + 18);
           ctx.stroke();
         }
       }
@@ -2268,17 +2840,17 @@ window.SuperBario99 = window.SuperBario99 || {};
       // VAPORWAVE (fases 26-30)
       // -----------------------------
       else if (isVapor) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#FF00FF');
         grd.addColorStop(0.55, '#800080');
         grd.addColorStop(1, '#000000');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // grade de computador antigo (pontos)
         ctx.fillStyle = 'rgba(0,255,255,0.10)';
-        for (let y = 70; y < this.canvas.height; y += 14) {
-          for (let x = 0; x < this.canvas.width; x += 14) {
+        for (let y = 70; y < h; y += 14) {
+          for (let x = 0; x < w; x += 14) {
             if (((x + y) % 28) === 0) ctx.fillRect(x, y, 2, 2);
           }
         }
@@ -2319,16 +2891,16 @@ window.SuperBario99 = window.SuperBario99 || {};
       // AURORA AERO (parte do ciclo de estéticas; em 99 fases o mapping é estendido)
       // -----------------------------
       else if (isAurora) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#191970');
         grd.addColorStop(1, '#000010');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // estrelas
         ctx.fillStyle = 'rgba(255,215,0,0.75)';
         for (let i = 0; i < 60; i++) {
-          const sx = (i * 37 + (this.cameraX * 0.05)) % this.canvas.width;
+          const sx = (i * 37 + (this.cameraX * 0.05)) % w;
           const sy = (i * 19) % 220;
           const s = (i % 3) + 1;
           ctx.fillRect(sx, sy, s, s);
@@ -2339,7 +2911,7 @@ window.SuperBario99 = window.SuperBario99 || {};
           ctx.strokeStyle = color;
           ctx.lineWidth = 4;
           ctx.beginPath();
-          for (let x = 0; x <= this.canvas.width; x += 10) {
+          for (let x = 0; x <= w; x += 10) {
             const t = (performance.now() * 0.001 * speed) + x * 0.03;
             const y = baseY + Math.sin(t) * amp;
             if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -2361,7 +2933,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.fill();
 
         // naves passando
-        const shipX = ((-this.cameraX * 0.40) + (performance.now() * 0.05)) % (this.canvas.width + 220) - 110;
+        const shipX = ((-this.cameraX * 0.40) + (performance.now() * 0.05)) % (w + 220) - 110;
         ctx.fillStyle = 'rgba(255,255,255,0.16)';
         ctx.beginPath();
         ctx.moveTo(shipX, 210);
@@ -2376,11 +2948,11 @@ window.SuperBario99 = window.SuperBario99 || {};
       // WINDOWS VISTA (aparece no Modo Livre)
       // -----------------------------
       else if (isVista) {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#4169E1');
         grd.addColorStop(1, '#0078D7');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // brilho "Aero Glass"
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -2388,18 +2960,18 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.arc(620, 80, 140, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
       }
 
       // -----------------------------
       // Fallback antigo (caso algum caller ainda mande themeId legado)
       // -----------------------------
       else if (themeId === 'japan') {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#ffb6d5');
         grd.addColorStop(1, '#ffeef6');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // Fuji
         const par = -(this.cameraX * 0.15) % 900;
@@ -2421,7 +2993,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // Templo/torii distante
         ctx.fillStyle = 'rgba(192, 57, 43, 0.4)';
         for (let i = 0; i < 4; i++) {
-          const x = (par + i * 240 + 60) % (this.canvas.width + 100);
+          const x = (par + i * 240 + 60) % (w + 100);
           ctx.fillRect(x, 320, 6, 60);
           ctx.fillRect(x + 26, 320, 6, 60);
           ctx.fillRect(x - 8, 315, 48, 8);
@@ -2433,17 +3005,17 @@ window.SuperBario99 = window.SuperBario99 || {};
         // lanternas distantes
         ctx.fillStyle = 'rgba(255,210,125,0.28)';
         for (let i = 0; i < 6; i++) {
-          const lx = ((par + 120 + i * 170) % (this.canvas.width + 140)) - 40;
+          const lx = ((par + 120 + i * 170) % (w + 140)) - 40;
           const ly = 250 + (i % 3) * 18;
           ctx.fillRect(lx, ly, 10, 14);
         }
 
       } else if (themeId === 'fruitiger') {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#a1d9ff');
         grd.addColorStop(1, '#eaf7ff');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // nuvens fofas + aviões de papel
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
@@ -2470,7 +3042,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
         // orbs/bolhas glossy (Fruitiger)
         for (let i = 0; i < 10; i++) {
-          const ox = ((this.cameraX * 0.28) + i * 110) % (this.canvas.width + 160) - 40;
+          const ox = ((this.cameraX * 0.28) + i * 110) % (w + 160) - 40;
           const oy = 110 + (i % 4) * 40;
           ctx.fillStyle = 'rgba(255,255,255,0.18)';
           ctx.beginPath();
@@ -2484,16 +3056,16 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       } else if (themeId === 'tecnozen') {
         ctx.fillStyle = '#08111b';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // circuitos neon
         ctx.strokeStyle = 'rgba(35,213,255,0.7)';
         ctx.lineWidth = 2;
         for (let i = 0; i < 9; i++) {
-          const x = ((i * 120) + (this.cameraX * 0.25)) % this.canvas.width;
+          const x = ((i * 120) + (this.cameraX * 0.25)) % w;
           ctx.beginPath();
           ctx.moveTo(x, 0);
-          ctx.lineTo(x, this.canvas.height);
+          ctx.lineTo(x, h);
           ctx.stroke();
         }
         ctx.strokeStyle = 'rgba(166,107,255,0.55)';
@@ -2501,14 +3073,14 @@ window.SuperBario99 = window.SuperBario99 || {};
           const y = (i * 70 + 30);
           ctx.beginPath();
           ctx.moveTo(0, y);
-          ctx.lineTo(this.canvas.width, y);
+          ctx.lineTo(w, y);
           ctx.stroke();
         }
 
         // lotus/círculos zen neon
         ctx.strokeStyle = 'rgba(35,213,255,0.25)';
         ctx.lineWidth = 2;
-        const cx = this.canvas.width * 0.5;
+        const cx = w * 0.5;
         const cy = 220;
         for (let r = 40; r <= 120; r += 20) {
           ctx.beginPath();
@@ -2518,7 +3090,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       } else if (themeId === 'dorfic') {
         ctx.fillStyle = '#0f1410';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // silhuetas góticas
         ctx.fillStyle = 'rgba(60,110,71,0.35)';
@@ -2533,7 +3105,7 @@ window.SuperBario99 = window.SuperBario99 || {};
         // névoa
         ctx.fillStyle = 'rgba(255,255,255,0.06)';
         for (let i = 0; i < 6; i++) {
-          const fx = ((this.cameraX * 0.12) + i * 160) % (this.canvas.width + 200) - 80;
+          const fx = ((this.cameraX * 0.12) + i * 160) % (w + 200) - 80;
           ctx.beginPath();
           ctx.arc(fx, 360, 70, 0, Math.PI * 2);
           ctx.fill();
@@ -2541,7 +3113,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       } else if (themeId === 'metro') {
         ctx.fillStyle = '#0b1320';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // trilhos
         ctx.strokeStyle = 'rgba(192,200,209,0.55)';
@@ -2557,22 +3129,22 @@ window.SuperBario99 = window.SuperBario99 || {};
         ctx.strokeStyle = 'rgba(74,163,255,0.6)';
         ctx.beginPath();
         ctx.moveTo(0, 330);
-        ctx.lineTo(this.canvas.width, 330);
+        ctx.lineTo(w, 330);
         ctx.stroke();
 
         // trem distante (parallax)
-        const tx = ((-this.cameraX * 0.55) % (this.canvas.width + 260)) + this.canvas.width;
+        const tx = ((-this.cameraX * 0.55) % (w + 260)) + w;
         ctx.fillStyle = 'rgba(192,200,209,0.25)';
         ctx.fillRect(tx - 260, 250, 220, 34);
         ctx.fillStyle = 'rgba(74,163,255,0.35)';
         for (let i = 0; i < 6; i++) ctx.fillRect(tx - 240 + i * 34, 258, 18, 10);
 
       } else if (themeId === 'evil') {
-        const grd = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, 0, h);
         grd.addColorStop(0, '#2b000a');
         grd.addColorStop(1, '#000000');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
 
         // nuvens tempestuosas
         ctx.fillStyle = 'rgba(80,0,20,0.65)';
@@ -2601,26 +3173,26 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       } else {
         // MemeFusion: mistura (sakura + neon + gradiente)
-        const grd = ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
+        const grd = ctx.createLinearGradient(0, 0, w, h);
         grd.addColorStop(0, '#ffb6d5');
         grd.addColorStop(0.5, '#23d5ff');
         grd.addColorStop(1, '#ffd27d');
         ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
         this._updateSakura();
         this._drawSakura();
 
         // glitch blocks
         ctx.fillStyle = 'rgba(0,0,0,0.10)';
         for (let i = 0; i < 8; i++) {
-          const gx = ((this.cameraX * 0.33) + i * 120) % (this.canvas.width + 200) - 60;
+          const gx = ((this.cameraX * 0.33) + i * 120) % (w + 200) - 60;
           ctx.fillRect(gx, 90 + (i % 4) * 40, 60, 12);
         }
       }
 
       if (darken > 0) {
         ctx.fillStyle = `rgba(0,0,0,${darken})`;
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, w, h);
       }
     }
 
@@ -2630,6 +3202,26 @@ window.SuperBario99 = window.SuperBario99 || {};
       const themeId = level.themeId;
       const bossLevel = this._isBossLevel(this.levelIndex);
       const tNow = (typeof now === 'number') ? now : performance.now();
+
+      // Mecânicas de fase especial (aplicação leve e segura)
+      // - gravity: substitui gravidade do jogo
+      // - playerSpeed: ajusta maxSpeed do player
+      const spMech = (level && level._sb99Mechanics && typeof level._sb99Mechanics === 'object') ? level._sb99Mechanics : null;
+      if (!this._isFreeMode && (!spMech || !Number.isFinite(Number(spMech.gravity)))) {
+        // evita “vazar” gravidade de fase anterior
+        this.gravity = 0.8;
+      }
+      if (spMech && Number.isFinite(Number(spMech.gravity))) {
+        this.gravity = Number(spMech.gravity);
+      }
+      if (this.player) {
+        if (!Number.isFinite(this.player._sb99BaseMaxSpeed)) this.player._sb99BaseMaxSpeed = this.player.maxSpeed;
+        if (spMech && Number.isFinite(Number(spMech.playerSpeed))) {
+          this.player.maxSpeed = Number(spMech.playerSpeed);
+        } else {
+          this.player.maxSpeed = this.player._sb99BaseMaxSpeed;
+        }
+      }
 
       // Determina estética efetiva aqui também (NPCs/lore)
       const effAesthetic = this._getEffectiveAestheticId(level, tNow);
@@ -2641,9 +3233,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       try { diff = this.weatherSystem?.applyDifficulty?.(diff, this._weather) || diff; } catch (_) {}
 
       const active = this.powerups?.getActive?.(tNow);
-      const timeSlow = (active === 'time' || active === 'cosmic');
-      const timeScale = timeSlow ? 0.55 : 1.0;
-      const diffScaled = timeSlow ? { ...diff, enemySpeed: diff.enemySpeed * timeScale } : diff;
+      let timeSlow = (active === 'time' || active === 'cosmic');
+      let timeScale = timeSlow ? 0.55 : 1.0;
+      let diffScaled = timeSlow ? { ...diff, enemySpeed: diff.enemySpeed * timeScale } : diff;
 
       // Ninja invisível: além de visual, vira invulnerável enquanto durar.
       // Reusa a mecânica existente de invencibilidade do player para não quebrar inimigos/hazards.
@@ -2658,6 +3250,53 @@ window.SuperBario99 = window.SuperBario99 || {};
       let puddleScale = 1.0;
       try { puddleScale = this.weatherSystem?.getSpeedScaleForPlayer?.(this.player, this._weather, tNow) || 1.0; } catch (_) {}
       const playerSpeedScale = Math.min(sandScale, puddleScale);
+
+      // -----------------------------
+      // Água / Nado / Oxigênio (fases especiais)
+      // -----------------------------
+      const spEnv = (level && level._sb99Environment && typeof level._sb99Environment === 'object') ? level._sb99Environment : null;
+      const canSwim = !!(spMech && spMech.canSwim);
+      const swimSpeed = (spMech && Number.isFinite(Number(spMech.swimSpeed))) ? Number(spMech.swimSpeed) : 3.0;
+      const waterResistance = (spMech && Number.isFinite(Number(spMech.waterResistance))) ? Number(spMech.waterResistance) : 0.0;
+
+      let waterLevel = null;
+      if (spEnv && Object.prototype.hasOwnProperty.call(spEnv, 'waterLevel')) {
+        const wl = Number(spEnv.waterLevel);
+        if (Number.isFinite(wl)) waterLevel = wl;
+      }
+
+      let inWater = false;
+      if (this.player && waterLevel !== null) {
+        // waterLevel <= 0 => fase toda submersa (profundezas)
+        inWater = (waterLevel <= 0) ? true : ((this.player.y + this.player.height) >= waterLevel);
+      }
+
+      // Oxigênio: só faz sentido quando a fase declara underwaterBreathing
+      const needsOxygen = !!(spMech && spMech.underwaterBreathing);
+      if (!this._isFreeMode && this.player && needsOxygen) {
+        const maxO2 = (spMech && Number.isFinite(Number(spMech.oxygenLevel))) ? Math.max(1, Number(spMech.oxygenLevel)) : 100;
+        const drain = (spMech && Number.isFinite(Number(spMech.oxygenDrain))) ? Math.max(0, Number(spMech.oxygenDrain)) : 0.10;
+
+        if (!this._sb99OxygenState || this._sb99OxygenState.levelIndex !== this.levelIndex || this._sb99OxygenState.max !== maxO2) {
+          this._sb99OxygenState = { levelIndex: this.levelIndex, value: maxO2, max: maxO2, nextDamageAt: tNow + 1000, active: true };
+        }
+
+        // Em fases submersas, considera sempre drenando
+        const draining = (waterLevel !== null) ? inWater : true;
+        if (draining) {
+          this._sb99OxygenState.value -= drain;
+          if (this._sb99OxygenState.value < 0) this._sb99OxygenState.value = 0;
+        }
+
+        if (this._sb99OxygenState.value <= 0 && tNow >= (this._sb99OxygenState.nextDamageAt || 0)) {
+          this.player.takeHit?.();
+          try { this.audio.playSfx('hurt'); } catch (_) {}
+          this._sb99OxygenState.nextDamageAt = tNow + 1000;
+        }
+      } else {
+        // sem oxigênio nesta fase
+        if (this._sb99OxygenState) this._sb99OxygenState.active = false;
+      }
 
       // Gamepad (polled)
       if (this._gamepadEnabled) {
@@ -2686,20 +3325,32 @@ window.SuperBario99 = window.SuperBario99 || {};
         ArrowUp: !!this.keys['ArrowUp'] || this._gamepadState.jump,
         ' ': !!this.keys[' '] || this._gamepadState.jump,
         x: !!this.keys['x'] || !!this.keys['X'] || this._gamepadState.attack,
-        X: !!this.keys['x'] || !!this.keys['X'] || this._gamepadState.attack
+        X: !!this.keys['x'] || !!this.keys['X'] || this._gamepadState.attack,
+        c: !!this.keys['c'] || !!this.keys['C'],
+        C: !!this.keys['c'] || !!this.keys['C'],
+        Shift: !!this.keys['Shift'],
+        z: !!this.keys['z'] || !!this.keys['Z'],
+        Z: !!this.keys['z'] || !!this.keys['Z'],
+        t: !!this.keys['t'] || !!this.keys['T'],
+        T: !!this.keys['t'] || !!this.keys['T'],
+        p: !!this.keys['p'] || !!this.keys['P'],
+        P: !!this.keys['p'] || !!this.keys['P']
       };
 
       // Edge detect (evita pular linhas em hold)
-      const prev = this._prevInput || { ArrowUp: false, space: false, x: false };
+      const prev = this._prevInput || { ArrowUp: false, space: false, x: false, c: false, t: false, p: false };
       const justUp = input.ArrowUp && !prev.ArrowUp;
       const justSpace = input[' '] && !prev.space;
       const justX = (input.x || input.X) && !prev.x;
+      const justC = (input.c || input.C) && !prev.c;
+      const justT = (input.t || input.T) && !prev.t;
+      const justP = (input.p || input.P) && !prev.p;
 
       // Se diálogo ativo: pausa gameplay e só avança texto
       if (this._dialogue && this._dialogue.active) {
-        if (justUp || justSpace || justX) this._advanceDialogue(tNow);
+        if (justUp || justSpace || justX || justC) this._advanceDialogue(tNow);
         this._cameraUpdate(level);
-        this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X) };
+        this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X), c: !!(input.c || input.C), t: !!(input.t || input.T), p: !!(input.p || input.P) };
         this._updateHud();
         return;
       }
@@ -2708,7 +3359,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       const canTalk = this._nearNpc && this._nearNpc.isNear?.(this.player);
       if (canTalk && (justUp || (justX && this._isTouchDevice()))) {
         this._startDialogue(this._nearNpc, tNow);
-        this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X) };
+        this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X), c: !!(input.c || input.C), t: !!(input.t || input.T), p: !!(input.p || input.P) };
         this._updateHud();
         return;
       }
@@ -2731,15 +3382,36 @@ window.SuperBario99 = window.SuperBario99 || {};
         this._updateParticles();
         this.audio.update();
         this._updateHud();
-        this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X) };
+        this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X), c: !!(input.c || input.C), t: !!(input.t || input.T), p: !!(input.p || input.P) };
         return;
       } else if (this._spawnPortal && this._spawnPortal.active) {
         // encerra portal
         this._spawnPortal = null;
       }
 
+      // Habilidades avançadas
+      if (this.player) {
+        if (justT) this._tryUseTimeSlowSkill(tNow);
+        if (justP) this._capturePhoto(tNow);
+      }
+
+      // Recalcula time-slow considerando habilidade do player
+      if (this._sb99TimeSkill && this._sb99TimeSkill.levelIndex === this.levelIndex && tNow < (this._sb99TimeSkill.until || 0)) {
+        timeSlow = true;
+      }
+      timeScale = timeSlow ? 0.55 : 1.0;
+      diffScaled = timeSlow ? { ...diff, enemySpeed: diff.enemySpeed * timeScale } : diff;
+
       // ações
-      if (input[' '] || input['ArrowUp']) this.player.jump(this.audio);
+      if (canSwim && inWater) {
+        if (justUp || justSpace) this.player.swimStroke?.(swimSpeed, this.audio);
+      }
+
+      // habilidade de classe (C)
+      this._handleClassSkill(level, tNow, justC);
+
+      // limpeza de plataformas temporárias
+      this._updateTempPlatforms(level, tNow);
       if (input['x'] || input['X']) {
         const dir = (this.player.direction === 'left') ? -1 : 1;
         const canFire = (active === 'fire' || active === 'cosmic') && this.powerups?.canShootFire?.(tNow);
@@ -2773,7 +3445,11 @@ window.SuperBario99 = window.SuperBario99 || {};
         }
       }
 
-      this.player.update(this.gravity, level, input, this.canvas.height, this.audio, tNow, { speedScale: playerSpeedScale });
+      this.player.update(this.gravity, level, input, (this._logicalH || 450), this.audio, tNow, {
+        speedScale: playerSpeedScale,
+        inWater: (canSwim && inWater),
+        waterResistance
+      });
 
       // câmera
       this._cameraUpdate(level);
@@ -2863,6 +3539,7 @@ window.SuperBario99 = window.SuperBario99 || {};
           const nextLevel = this._getLevel();
           const sp = this._getPlayerSpawnPoint(nextLevel, 60, 32, 52);
           this.player = new SuperBario99.PlayerV2(sp.x, sp.y);
+          this._applyPlayerOptions();
           this.player.score = score;
           this.player.lives = lives;
           this._beginSpawnPortal(nextLevel, tNow);
@@ -2889,6 +3566,17 @@ window.SuperBario99 = window.SuperBario99 || {};
       // inimigos
       if (!this.enemies) this.enemies = this._buildEnemiesForLevel(this.levelIndex);
 
+      // Zona segura de NPC: impede inimigos de atrapalharem diálogo/interação.
+      const npcZones = this._getNpcSafeZones();
+      const playerInNpcZone = (() => {
+        if (!this.player || !npcZones.length) return false;
+        const pr = { x: this.player.x, y: this.player.y, w: this.player.width, h: this.player.height };
+        for (const z of npcZones) {
+          if (this._rectsOverlap(pr, z)) return true;
+        }
+        return false;
+      })();
+
       // hitbox ataque
       const hit = this.player.getAttackHitbox();
 
@@ -2897,13 +3585,27 @@ window.SuperBario99 = window.SuperBario99 || {};
       for (const e of this.enemies) {
         if (!e.alive) continue;
 
+        // Não deixa inimigos invadirem a área segura do NPC.
+        // Também evita qualquer dano/colisão enquanto estiver dentro.
+        if (npcZones.length && e.type !== 'boss') {
+          const er = { x: e.x, y: e.y, w: e.width || 28, h: e.height || 28 };
+          let zHit = null;
+          for (const z of npcZones) {
+            if (this._rectsOverlap(er, z)) { zHit = z; break; }
+          }
+          if (zHit) {
+            this._repelEnemyFromNpcZone(e, zHit, level);
+            continue;
+          }
+        }
+
         // Congelado: pausa IA/movimento por alguns segundos
         if (e._sb99FreezeUntil && tNow < e._sb99FreezeUntil) {
           // não atualiza
         } else if (e.type === 'yokai') {
           // Yokai usa A* em tiers superiores
           this._ensureGridForLevel(this.levelIndex);
-          e.update(level, this.player, diffScaled, this.canvas.height);
+          e.update(level, this.player, diffScaled, (this._logicalH || 450));
         } else {
           e.update(level, this.player, diffScaled);
         }
@@ -2926,8 +3628,8 @@ window.SuperBario99 = window.SuperBario99 || {};
           e._sb99SpawnRequests.length = 0;
         }
 
-        // dano do player
-        if (hit) {
+        // dano do player (desabilita enquanto o player estiver na zona do NPC)
+        if (hit && !playerInNpcZone) {
           if (
             hit.x < e.x + e.width &&
             hit.x + hit.width > e.x &&
@@ -2946,10 +3648,12 @@ window.SuperBario99 = window.SuperBario99 || {};
           }
         }
 
-        // colisão do inimigo com player
-        const collided = e.checkPlayerCollision(this.player);
-        if (collided) {
-          this.audio.playSfx(e.type === 'boss' ? 'bossHit' : 'enemyDie');
+        // colisão do inimigo com player (desabilita enquanto o player estiver na zona do NPC)
+        if (!playerInNpcZone) {
+          const collided = e.checkPlayerCollision(this.player);
+          if (collided) {
+            this.audio.playSfx(e.type === 'boss' ? 'bossHit' : 'enemyDie');
+          }
         }
 
         // Aura elétrica: dano por proximidade
@@ -3047,7 +3751,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       this.audio.update();
       this._updateHud();
 
-      this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X) };
+      this._prevInput = { ArrowUp: !!input.ArrowUp, space: !!input[' '], x: !!(input.x || input.X), c: !!(input.c || input.C), t: !!(input.t || input.T), p: !!(input.p || input.P) };
     }
 
     _drawGame() {
@@ -3236,7 +3940,7 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       const w = 360;
       const h = 34;
-      const x = Math.floor((this.canvas.width - w) / 2);
+      const x = Math.floor((this._logicalW - w) / 2);
       const y = 14;
 
       ctx.save();
@@ -3280,7 +3984,7 @@ window.SuperBario99 = window.SuperBario99 || {};
       // desenha um "mini layout" genérico no preview
       const ctx = this.ctx;
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.fillRect(0, 380, this.canvas.width, 70);
+      ctx.fillRect(0, 380, this._logicalW, 70);
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
       for (let i = 0; i < 6; i++) {
         ctx.fillRect(80 + i * 120, 320 - (i % 3) * 40, 90, 16);

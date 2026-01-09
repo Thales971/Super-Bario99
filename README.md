@@ -6,19 +6,27 @@ Um jogo de plataforma 2D desenvolvido inteiramente em **HTML5 Canvas e JavaScrip
 
 ## 🎮 Funcionalidades Principais
 
-- **50 Fases Procedurais**: Níveis gerados algoritmicamente que aumentam em tamanho e dificuldade.
-- **7 Temas Estéticos**: Cada bloco de 5 fases possui uma identidade visual e sonora única:
-  1.  _Japan Retro_ (Sakuras, Templos, Fuji)
-  2.  _Fruitiger Aero_ (Glossy, Céu Azul, Otimismo Tech)
-  3.  _TecnoZen_ (Neon, Circuitos, Lótus Cibernética)
-  4.  _Dorfic_ (Gótico, Névoa, Silhuetas)
-  5.  _Metro_ (Urbano, Trens, Concreto)
-  6.  _Evil_ (Tempestades, Vermelho, Caos)
-  7.  _MemeFusion_ (A mistura glitch de tudo)
+- **100 Fases Procedurais**: Níveis gerados algoritmicamente que aumentam em tamanho e dificuldade.
+- **Estéticas/Temas por fase**: Cada bloco de fases pode ter uma identidade visual e sonora única (ex.: _Japan Retro_, _Windows XP_, _Fruitiger Aero_, _Tecno Zen_, _Dorfic_, _Metro Aero_, _Vaporwave_, _Aurora Aero_, _Windows Vista_, _MemeFusion_).
 - **Áudio Processual**: Trilha sonora dinâmica que muda conforma o tema e sfx (efeitos sonoros) sintetizados na hora (sem carregar arquivos pesados de mp3).
 - **Sistema de Combate**: Pule na cabeça dos inimigos ou use seu ataque de espada com a tecla **X**.
 - **Inimigos com IA**: De simples patrulheiros a Yokais que perseguem o jogador usando pathfinding (A\*) e Bosses desafiadores.
+- **Fases especiais (mecânicas reais)**: Algumas fases podem ativar mecânicas/ambientes específicos (ex.: água/nado e oxigênio com HUD em fase oceânica) e spawns dedicados de inimigos.
+- **Clima dinâmico**: Camadas de chuva/neve/areia/tempestade com partículas e overlay.
+- **Qualidade visual melhor (Retina/DPR)**: O canvas usa buffer físico escalado (com limites) para ficar mais nítido em telas de alta densidade, mantendo a jogabilidade em coordenadas lógicas.
+- **NPCs com visual próprio + área segura**: NPCs têm sprite/contorno próprios e inimigos são repelidos/perdem dano perto deles para não atrapalhar interação/diálogos.
 - **Progresso Persistente**: O jogo salva automaticamente sua fase,vidas e pontuação. Botão "Continuar" disponível no menu.
+
+## ✨ Atualizações recentes (jan/2026)
+
+- **Opções persistentes** (localStorage): classe, paleta e chapéu.
+- **Customização de chapéu**: Nenhum / Boné / Gorro / Coroa.
+- **Habilidades**:
+  - **C**: habilidade da classe (ex.: Engenheiro repara plataforma; Mago cria plataforma temporária)
+  - **Shift**: dash
+  - **T**: slow time (cargas por fase + cooldown)
+  - **P**: foto (exporta PNG do canvas)
+- **Estéticas secretas**: algumas fases podem entrar raramente em uma estética “secreta” (offline/determinístico). Não aparece no Modo Livre.
 
 ## 🕹️ Controles
 
@@ -27,7 +35,19 @@ Um jogo de plataforma 2D desenvolvido inteiramente em **HTML5 Canvas e JavaScrip
 | **Setas (Esq/Dir)**    | Mover Personagem         |
 | **Seta Cima / Espaço** | Pular                    |
 | **X**                  | Atacar (Golpe de Espada) |
+| **Shift**              | Dash                     |
+| **C**                  | Skill da classe          |
+| **T**                  | Slow time                |
+| **P**                  | Foto (salvar PNG)        |
 | **Mouse (Clique)**     | Interagir com Menu       |
+
+### Mobile / Touch
+
+- **Botões na tela**: esquerda/direita, pulo e ataque (aparece automaticamente no mobile).
+- **Gestos no canvas**:
+  - Arrasto horizontal enquanto segura: mover
+  - Swipe para cima: pular
+  - **Duplo toque**: usar power-up
 
 ### Blocos "?" e Power-ups
 
@@ -47,6 +67,12 @@ Não é necessário instalar dependências de node_modules. O jogo roda nativame
 3.  **Acesse no navegador**:
     - `http://localhost:5500`
 
+### Rodar no celular (mesma rede)
+
+1. Rode o servidor local no PC.
+2. Descubra o IP da sua máquina na rede (ex.: `ipconfig` no Windows).
+3. No celular, acesse `http://SEU_IP:5500`.
+
 ## 📂 Estrutura do Código (v2)
 
 ## 🎨 Sistema de Estéticas (Theme Manager)
@@ -57,16 +83,17 @@ O jogo aplica automaticamente uma estética visual por fase (1–50) usando o ar
 
 ### Mapeamento padrão por bloco
 
-- Fases 1–5: **Windows XP** (`windows-xp`)
-- Fases 6–10: **Fruitiger Aero** (`fruitiger-aero`)
-- Fases 11–15: **Tecno Zen** (`tecno-zen`)
-- Fases 16–20: **Dorfic** (`dorfic`)
-- Fases 21–25: **Metro Aero** (`metro-aero`)
-- Fases 26–30: **Vaporwave** (`vaporwave`)
-- Fases 31–35: **Aurora Aero** (`aurora-aero`)
-- Fases 36–40: **Windows Vista** (`windows-vista`)
-- Fases 41–45: **Vaporwave** (`vaporwave`)
-- Fases 46–50: **Aurora Aero** (`aurora-aero`)
+- Fases 1–10: **Japan Retro** (`japan-retro`)
+- Fases 11–20: **Fruitiger Aero** (`fruitiger-aero`)
+- Fases 21–30: **Dorfic** (`dorfic`)
+- Fases 31–40: **Metro Aero** (`metro-aero`)
+- Fases 41–49: **Vaporwave** (`vaporwave`)
+- Fases 50–59: **Fruitiger Ocean** (`fruitiger-ocean`)
+- Fases 60–69: **Fruitiger Sunset** (`fruitiger-sunset`)
+- Fases 70–79: **Fruitiger Neon** (`fruitiger-neon`)
+- Fases 80–89: **Fruitiger Forest** (`fruitiger-forest`)
+- Fases 90–99: **Fruitiger Galaxy** (`fruitiger-galaxy`)
+- Fase 100: **Caos Final** (`caos-final`)
 
 ### Como adicionar uma nova estética
 
@@ -76,11 +103,28 @@ O jogo aplica automaticamente uma estética visual por fase (1–50) usando o ar
 
 O Theme Manager aplica o visual principalmente via **CSS Variables** (tipografia, blur, radius, etc.) e usa um **overlay Canvas** leve para efeitos (scanlines/glitch).
 
+## ⭐ Fases especiais (config)
+
+As fases especiais ficam configuradas em:
+
+- [js/levels/special-phases-config.js](js/levels/special-phases-config.js)
+
+Elas podem definir:
+
+- Mecânicas/ambiente (ex.: água/nado/oxigênio)
+- Inimigos dedicados (spawn explícito por fase)
+
+### Inimigos temáticos adicionados
+
+- Oceano/Fruitiger Ocean: **Jellyfish** e **Shark**
+- Japan Retro 7 (especial): **Oni Mask** e **Monkey**
+
 ## 🧪 Modo Livre / Criativo
 
 No menu principal existe o botão **MODO LIVRE**. Ele abre um painel onde você escolhe:
 
 - Fase inicial (1–50)
+- Fase inicial (1–100)
 - Estética (override)
 - Intensidade de efeitos
 - Quantidade/pool de inimigos

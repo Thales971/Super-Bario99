@@ -373,6 +373,9 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!canvas) return;
       if (type === 'none') return;
 
+      const lw = (canvas && Number.isFinite(canvas._sb99LogicalWidth)) ? canvas._sb99LogicalWidth : canvas.width;
+      const lh = (canvas && Number.isFinite(canvas._sb99LogicalHeight)) ? canvas._sb99LogicalHeight : canvas.height;
+
       // mais partículas (escala por área em CSS px; cap conservador para mobile)
       const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
       const cssW = Math.max(1, canvas.width / Math.max(1, dpr));
@@ -388,8 +391,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       count = Math.max(40, Math.min(cap, count));
       for (let i = 0; i < count; i++) {
         this._particles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
+          x: Math.random() * lw,
+          y: Math.random() * lh,
           vx: 0,
           vy: 0,
           r: 1 + Math.random() * 2,
@@ -402,8 +405,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       const backCount = Math.max(18, Math.min(backCap, Math.floor(18 + intensity * 70)));
       for (let i = 0; i < backCount; i++) {
         this._backParticles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
+          x: Math.random() * lw,
+          y: Math.random() * lh,
           vx: (Math.random() * 0.6) - 0.3,
           vy: (Math.random() * 0.35) - 0.15,
           r: 10 + Math.random() * 26,
@@ -418,8 +421,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       const lensCount = Math.max(3, Math.min(10, Math.floor(4 + intensity * 8)));
       for (let i = 0; i < lensCount; i++) {
         this._lensDrops.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
+          x: Math.random() * lw,
+          y: Math.random() * lh,
           r: 16 + Math.random() * 40,
           vy: 0.15 + Math.random() * 0.55,
           a: 0.06 + Math.random() * 0.08
@@ -434,8 +437,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (weather.type === 'none') return;
 
       const t = (typeof now === 'number') ? now : performance.now();
-      const w = canvas.width;
-      const h = canvas.height;
+      const w = (canvas && Number.isFinite(canvas._sb99LogicalWidth)) ? canvas._sb99LogicalWidth : canvas.width;
+      const h = (canvas && Number.isFinite(canvas._sb99LogicalHeight)) ? canvas._sb99LogicalHeight : canvas.height;
       const intensity = weather.intensity || 0;
       const groundY = (opt && typeof opt.groundY === 'number') ? opt.groundY : (h - 90);
       const audio = opt?.audio || null;
@@ -614,7 +617,8 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (weather.type === 'rain' || weather.type === 'storm') {
         if (!this._nextPuddleAt) this._nextPuddleAt = t + 600;
         if (t >= this._nextPuddleAt) {
-          const span = Math.max(260, canvas.width);
+          const w = (canvas && Number.isFinite(canvas._sb99LogicalWidth)) ? canvas._sb99LogicalWidth : canvas.width;
+          const span = Math.max(260, w);
           const worldX = cameraX + (Math.random() * span);
           const pw = 28 + Math.random() * (64 + intensity * 80);
           const ph = 4 + Math.random() * 5;
@@ -673,12 +677,15 @@ window.SuperBario99 = window.SuperBario99 || {};
       if (!this._puddles || !this._puddles.length) return;
       const t = (typeof now === 'number') ? now : performance.now();
 
+      const w = (canvas && Number.isFinite(canvas._sb99LogicalWidth)) ? canvas._sb99LogicalWidth : canvas.width;
+      const h = (canvas && Number.isFinite(canvas._sb99LogicalHeight)) ? canvas._sb99LogicalHeight : canvas.height;
+
       ctx.save();
       ctx.globalCompositeOperation = 'source-over';
       for (const p of this._puddles) {
         if (!p || (p.until || 0) <= t) continue;
         const x = p.x - (cameraX || 0);
-        if (x + p.w < -40 || x > canvas.width + 40) continue;
+        if (x + p.w < -40 || x > w + 40) continue;
 
         // poça: brilho suave + borda
         const alpha = 0.16 + (weather.intensity || 0) * 0.18;
@@ -703,8 +710,8 @@ window.SuperBario99 = window.SuperBario99 || {};
 
       const t = (typeof now === 'number') ? now : performance.now();
       const intensity = weather.intensity || 0;
-      const w = canvas.width;
-      const h = canvas.height;
+      const w = (canvas && Number.isFinite(canvas._sb99LogicalWidth)) ? canvas._sb99LogicalWidth : canvas.width;
+      const h = (canvas && Number.isFinite(canvas._sb99LogicalHeight)) ? canvas._sb99LogicalHeight : canvas.height;
 
       ctx.save();
 

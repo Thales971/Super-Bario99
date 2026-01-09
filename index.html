@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Super-Bario99</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -35,13 +35,70 @@
         <div class="menu-card" role="dialog" aria-label="Menu inicial">
             <h1>SUPER-BARIO99</h1>
             <div class="menu-sub">100 fases • 11 bosses épicos • 10 vidas</div>
+            <div id="daily-challenge" class="menu-sub" style="margin-top:-6px; opacity:0.95; display:none;"></div>
             <div class="menu-actions" aria-label="Ações do menu">
                 <button id="continue-btn" style="display: none;">CONTINUAR</button>
                 <button id="start-btn">NOVO JOGO</button>
                 <button id="free-mode-btn">MODO LIVRE</button>
+                <button id="settings-btn">OPÇÕES</button>
                 <button id="instructions-btn">INSTRUÇÕES</button>
             </div>
         </div>
+    </div>
+
+    <div id="settings" style="display: none;">
+        <h2>OPÇÕES</h2>
+        <div class="settings-grid" role="group" aria-label="Configurações">
+            <label>
+                Classe do personagem
+                <select id="opt-class" aria-label="Selecionar classe">
+                    <option value="bario">Bario (equilibrado)</option>
+                    <option value="ninja">Ninja (pulo alto + invisibilidade)</option>
+                    <option value="engineer">Engenheiro (repara plataformas)</option>
+                    <option value="mage">Mago (cria plataforma temporária)</option>
+                </select>
+            </label>
+
+            <label>
+                Paleta
+                <select id="opt-palette" aria-label="Selecionar paleta">
+                    <option value="default">Padrão</option>
+                    <option value="ocean">Ocean</option>
+                    <option value="neon">Neon</option>
+                    <option value="retro">Retrô</option>
+                </select>
+            </label>
+
+            <label>
+                Chapéu
+                <select id="opt-hat" aria-label="Selecionar chapéu">
+                    <option value="none">Nenhum</option>
+                    <option value="cap">Boné</option>
+                    <option value="beanie">Gorro</option>
+                    <option value="crown">Coroa</option>
+                </select>
+            </label>
+
+            <label class="settings-row">
+                <input id="opt-lowpower" type="checkbox" />
+                Modo baixo consumo (menos efeitos)
+            </label>
+
+            <label class="settings-row">
+                <input id="opt-reduceflashes" type="checkbox" />
+                Acessibilidade: reduzir flashes/glitch
+            </label>
+
+            <label class="settings-row">
+                <input id="opt-gamepad" type="checkbox" checked />
+                Ativar controle (Gamepad)
+            </label>
+        </div>
+
+        <p style="max-width:520px; opacity:0.92; font-size:18px;">
+            Atalhos: <strong>C</strong>=habilidade da classe • <strong>Shift</strong>=dash • <strong>T</strong>=slow time • <strong>P</strong>=foto
+        </p>
+        <button id="settings-back-btn">VOLTAR</button>
     </div>
     
     <div id="instructions" style="display: none;">
@@ -210,6 +267,8 @@
         <script src="js/ai/difficulty-system.js"></script>
         <script src="js/ai/pathfinding.js"></script>
         <script src="js/levels/levels.js"></script>
+        <script src="js/levels/secret-phase-system.js"></script>
+        <script src="js/levels/special-phases-config.js"></script>
         <script src="js/powerups/gear-renderer.js"></script>
         <script src="js/powerups/powerup-system.js"></script>
         <script src="js/powerups/question-blocks.js"></script>
@@ -217,12 +276,17 @@
         <script src="js/environment/weather-system.js"></script>
         <script src="js/environment/scenery-builder.js"></script>
         <script src="js/environment/dynamic-backgrounds.js"></script>
+        <script src="js/enemies/theme-enemy-factory.js"></script>
         <script src="js/enemies/traditional/ninja.js"></script>
         <script src="js/enemies/traditional/yokai.js"></script>
         <script src="js/enemies/traditional/samurai.js"></script>
         <script src="js/enemies/traditional/tanuki.js"></script>
         <script src="js/enemies/traditional/kitsune.js"></script>
         <script src="js/enemies/traditional/drone.js"></script>
+        <script src="js/enemies/themed/jellyfish.js"></script>
+        <script src="js/enemies/themed/shark.js"></script>
+        <script src="js/enemies/themed/oni-mask.js"></script>
+        <script src="js/enemies/themed/monkey.js"></script>
         <script src="js/enemies/bosses/boss-registry.js"></script>
         <script src="js/enemies/bosses/theme-boss.js"></script>
         <script src="js/core/player.js"></script>
